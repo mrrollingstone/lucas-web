@@ -1,10 +1,23 @@
 import type { Metadata } from "next";
+import { DM_Sans, Fraunces } from "next/font/google";
 import "./globals.css";
 
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  display: "swap",
+});
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "AI Airbnb Listing Review · HelloHosty",
+  title: "Free AI Listing Review | Hello Hosty",
   description:
-    "HelloHosty reviews your short-term rental listing end-to-end and sends a branded PDF with scores, quick wins and rewritten copy — in minutes.",
+    "Hello Hosty reviews your Airbnb listing and delivers a free professional report with scores, quick wins, and ready-to-paste optimised copy — in seconds.",
 };
 
 export default function RootLayout({
@@ -13,19 +26,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en-GB">
-      <body className="min-h-screen bg-brand-mist text-brand-ink antialiased">
-        <header className="bg-white border-b border-black/5">
-          <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
-            <a href="https://hellohosty.com" className="font-semibold tracking-tight">
-              HelloHosty
-            </a>
-            <span className="text-xs font-semibold uppercase tracking-widest text-brand-teal">
-              AI Listing Review
-            </span>
-          </div>
-        </header>
-        <main>{children}</main>
+    <html lang="en-GB" className={`${dmSans.variable} ${fraunces.variable}`}>
+      <body className="min-h-screen bg-brand-mist font-sans text-brand-dark antialiased">
+        {children}
       </body>
     </html>
   );

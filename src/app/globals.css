@@ -4,6 +4,31 @@
 
 :root {
   color-scheme: light;
+  --teal: #2BB5B2;
+  --grey-200: #e0e0e0;
 }
 
-html, body { background: #F2F2F2; }
+html,
+body {
+  background: #f2f2f2;
+}
+
+/* ── Scan-line shimmer (pseudo-element gradient can't be done in Tailwind) ── */
+.scan-line {
+  @apply relative h-2.5 rounded-full bg-brand-grey200 overflow-hidden;
+}
+.scan-line::after {
+  content: "";
+  @apply absolute top-0 h-full w-full;
+  left: -100%;
+  background: linear-gradient(90deg, transparent, var(--teal), transparent);
+  animation: scanMove 2s ease infinite;
+}
+.scan-line:nth-child(1) { width: 90%; }
+.scan-line:nth-child(2) { width: 70%; }
+.scan-line:nth-child(3) { width: 85%; }
+.scan-line:nth-child(4) { width: 55%; }
+
+.scan-line:nth-child(2)::after { animation-delay: 0.3s; }
+.scan-line:nth-child(3)::after { animation-delay: 0.6s; }
+.scan-line:nth-child(4)::after { animation-delay: 0.9s; }

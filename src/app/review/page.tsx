@@ -1,5 +1,6 @@
-import { ReviewForm } from "@/components/ReviewForm";
+import { redirect } from "next/navigation";
 
-export default function PublicReviewPage() {
-  return <ReviewForm memberTier={false} />;
+// Old /review URL → redirect to /buy so bookmarks don't 404.
+export default function ReviewRedirect() {
+  redirect("/buy");
 }

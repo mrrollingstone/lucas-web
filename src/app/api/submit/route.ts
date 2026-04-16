@@ -69,8 +69,8 @@ export async function POST(req: NextRequest) {
       member_tier: String(body.member_tier),
     },
     success_url:
-      `${process.env.PUBLIC_BASE_URL}/review/confirmation?email=${encodeURIComponent(body.email)}`,
-    cancel_url: `${process.env.PUBLIC_BASE_URL}${body.member_tier ? "/review/member" : "/review"}`,
+      `${process.env.PUBLIC_BASE_URL}/buy/confirmation?email=${encodeURIComponent(body.email)}`,
+    cancel_url: `${process.env.PUBLIC_BASE_URL}${body.member_tier ? "/buy/member" : "/buy"}`,
   });
 
   return NextResponse.json({ next: "stripe", checkout_url: session.url });
