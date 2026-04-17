@@ -50,12 +50,17 @@ export default {
           from: { transform: "scale(0)", opacity: "0" },
           to: { transform: "scale(1)", opacity: "1" },
         },
+        spinSlow: {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
+        },
       },
       animation: {
         "fade-up": "fadeUp 0.6s ease forwards",
         pulse: "pulse 1.5s ease infinite",
         "scan-move": "scanMove 2s ease infinite",
         "confirm-pop": "confirmPop 0.5s cubic-bezier(.34,1.56,.64,1) forwards",
+        "spin-slow": "spinSlow 4s linear infinite",
       },
     },
   },

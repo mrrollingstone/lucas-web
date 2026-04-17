@@ -1,13 +1,11 @@
 "use client";
 
 /**
- * 4-step free-first-review funnel — ported from lucas-landing-page.html
+ * 3-step free-first-review funnel
  *
  * Step 1: Hero — paste Airbnb URL → "Get free review"
- * Step 2: Scrape + preview — AI scan animation → scraped data card → optional
- *         cross-platform URLs → Continue
- * Step 3: Email collect — personalised greeting from scrape → email only
- * Step 4: Confirmation — timeline + HelloHosty upsell
+ * Step 2: Email collect — frictionless email-only capture
+ * Step 3: Animated AI generation → confirmation
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -17,52 +15,22 @@ import Image from "next/image";
 interface SessionData {
   listing_url: string;
   platform: string;
-  scraped_at: string | null;
-  host_name: string;
-  property_name: string;
-  superhost: boolean;
-  reviews_count: number;
-  avg_rating: number;
-  bedrooms: number;
-  bathrooms: number;
-  max_guests: number;
-  hero_image_url: string;
-  profile_image_url: string;
-  booking_url: string;
-  vrbo_url: string;
-  website_url: string;
   email: string;
-  is_first_time: boolean;
   submitted_at: string | null;
 }
 
 const initialSession: SessionData = {
   listing_url: "",
   platform: "airbnb",
-  scraped_at: null,
-  host_name: "",
-  property_name: "",
-  superhost: false,
-  reviews_count: 0,
-  avg_rating: 0,
-  bedrooms: 0,
-  bathrooms: 0,
-  max_guests: 0,
-  hero_image_url: "",
-  profile_image_url: "",
-  booking_url: "",
-  vrbo_url: "",
-  website_url: "",
   email: "",
-  is_first_time: true,
   submitted_at: null,
 };
 
 /* ─── Step-dot progress bar ─── */
-function StepsBar({ current }: { current: 1 | 2 | 3 | 4 }) {
+function StepsBar({ current }: { current: 1 | 2 | 3 }) {
   return (
     <div className="mb-10 flex items-center justify-center gap-2">
-      {[1, 2, 3, 4].map((n, i) => (
+      {[1, 2, 3].map((n, i) => (
         <span key={n} className="flex items-center gap-2">
           <span
             className={`h-2.5 rounded-full transition-all duration-400 ${
@@ -73,25 +41,30 @@ function StepsBar({ current }: { current: 1 | 2 | 3 | 4 }) {
                   : "w-2.5 bg-brand-grey200"
             }`}
           />
-          {i < 3 && <span className="h-0.5 w-6 bg-brand-grey200" />}
+          {i < 2 && <span className="h-0.5 w-6 bg-brand-grey200" />}
         </span>
       ))}
     </div>
   );
 }
 
-/* ─── Scan-status messages ─── */
-const SCAN_MESSAGES = [
+/* ─── Generation status messages ─── */
+const GEN_MESSAGES = [
   "Connecting to Airbnb\u2026",
   "Scraping listing data\u2026",
   "Extracting photos & amenities\u2026",
   "Reading reviews & ratings\u2026",
   "Pulling pricing data\u2026",
+  "Running AI analysis\u2026",
+  "Scoring against best practices\u2026",
+  "Writing optimised copy\u2026",
+  "Building your PDF report\u2026",
+  "Sending to your inbox\u2026",
 ];
 
 /* ═══════════════════════════ MAIN COMPONENT ═══════════════════════════ */
 export function LandingFunnel() {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [session, setSession] = useState<SessionData>(initialSession);
 
   /* Step 1 */
@@ -99,16 +72,13 @@ export function LandingFunnel() {
   const [urlError, setUrlError] = useState(false);
 
   /* Step 2 */
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanStatus, setScanStatus] = useState(SCAN_MESSAGES[0]);
-  const [scrapeReady, setScrapeReady] = useState(false);
-  const [bookingUrl, setBookingUrl] = useState("");
-  const [vrboUrl, setVrboUrl] = useState("");
-  const [websiteUrl, setWebsiteUrl] = useState("");
-
-  /* Step 3 */
   const [emailValue, setEmailValue] = useState("");
   const [emailError, setEmailError] = useState(false);
+
+  /* Step 3 — generation animation */
+  const [genMsgIndex, setGenMsgIndex] = useState(0);
+  const [genDone, setGenDone] = useState(false);
+  const [completedSteps, setCompletedSteps] = useState(0);
 
   /* Navbar scroll shadow */
   const [scrolled, setScrolled] = useState(false);
@@ -120,7 +90,7 @@ export function LandingFunnel() {
 
   /* ─── Navigation ─── */
   const goToStep = useCallback(
-    (n: 1 | 2 | 3 | 4) => {
+    (n: 1 | 2 | 3) => {
       setStep(n);
       window.scrollTo({ top: 0, behavior: "smooth" });
     },
@@ -137,74 +107,9 @@ export function LandingFunnel() {
     setUrlError(false);
     setSession((s) => ({ ...s, listing_url: url }));
     goToStep(2);
-    callScraper(url);
   }, [urlValue, goToStep]);
 
-  /* ─── Scraper call ─── */
-  const callScraper = useCallback(async (url: string) => {
-    setIsScanning(true);
-    setScrapeReady(false);
-    setScanStatus(SCAN_MESSAGES[0]);
-
-    let msgIndex = 0;
-    const iv = setInterval(() => {
-      msgIndex++;
-      if (msgIndex < SCAN_MESSAGES.length) setScanStatus(SCAN_MESSAGES[msgIndex]);
-    }, 1200);
-
-    try {
-      const r = await fetch("/api/scrape", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, platform: "airbnb" }),
-      });
-      if (!r.ok) throw new Error("fail");
-      const data = await r.json();
-      clearInterval(iv);
-
-      setSession((s) => ({
-        ...s,
-        host_name: data.host?.name || "Host",
-        property_name: data.content?.title || "Property",
-        superhost: data.host?.superhost || false,
-        reviews_count: data.reviews?.count || 0,
-        avg_rating: data.reviews?.average_rating || 0,
-        bedrooms: data.property?.bedrooms || 0,
-        bathrooms: data.property?.bathrooms || 0,
-        max_guests: data.property?.max_guests || 0,
-        hero_image_url: data.images?.hero_cloudinary_url || "",
-        profile_image_url: data.host?.profile_image_url || "",
-        scraped_at: data.scraped_at || new Date().toISOString(),
-      }));
-      setIsScanning(false);
-      setScrapeReady(true);
-    } catch {
-      clearInterval(iv);
-      // Demo fallback — extract listing ID from URL
-      const m = url.match(/rooms\/(\d+)/);
-      const id = m ? m[1] : String(Math.floor(Math.random() * 99999));
-      setScanStatus("Analysis ready");
-
-      setSession((s) => ({
-        ...s,
-        host_name: `Host #${id}`,
-        property_name: `Airbnb Listing ${id}`,
-        superhost: Math.random() > 0.3,
-        reviews_count: Math.floor(Math.random() * 200) + 5,
-        avg_rating: Number((Math.random() + 4).toFixed(2)),
-        bedrooms: Math.floor(Math.random() * 4) + 1,
-        bathrooms: Math.floor(Math.random() * 3) + 1,
-        max_guests: Math.floor(Math.random() * 6) + 2,
-        scraped_at: new Date().toISOString(),
-      }));
-      setTimeout(() => {
-        setIsScanning(false);
-        setScrapeReady(true);
-      }, 800);
-    }
-  }, []);
-
-  /* ─── Step 3 → 4: Submit email ─── */
+  /* ─── Step 2 → 3: Submit email & start pipeline ─── */
   const submitEmail = useCallback(async () => {
     const email = emailValue.trim();
     if (!email || !email.includes("@") || !email.includes(".")) {
@@ -216,39 +121,55 @@ export function LandingFunnel() {
     const now = new Date().toISOString();
     const payload = {
       email,
-      host_name: session.host_name,
-      property_name: session.property_name,
       listing_url: session.listing_url,
       platform: session.platform,
-      superhost: session.superhost,
-      reviews_count: session.reviews_count,
-      avg_rating: session.avg_rating,
-      booking_url: bookingUrl.trim(),
-      vrbo_url: vrboUrl.trim(),
-      website_url: websiteUrl.trim(),
-      is_first_time: session.is_first_time,
+      is_first_time: true,
       submitted_at: now,
-      scraped_at: session.scraped_at,
     };
 
-    setSession((s) => ({
-      ...s,
-      email,
-      booking_url: bookingUrl.trim(),
-      vrbo_url: vrboUrl.trim(),
-      website_url: websiteUrl.trim(),
-      submitted_at: now,
-    }));
+    setSession((s) => ({ ...s, email, submitted_at: now }));
 
-    // Fire-and-forget save
+    // Fire-and-forget save — this triggers the full pipeline server-side
     fetch("/api/submissions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }).catch(() => {});
 
-    goToStep(4);
-  }, [emailValue, session, bookingUrl, vrboUrl, websiteUrl, goToStep]);
+    goToStep(3);
+  }, [emailValue, session, goToStep]);
+
+  /* ─── Generation animation driver ─── */
+  useEffect(() => {
+    if (step !== 3) return;
+
+    // Cycle through generation messages
+    const msgIv = setInterval(() => {
+      setGenMsgIndex((prev) => {
+        if (prev < GEN_MESSAGES.length - 1) return prev + 1;
+        return prev;
+      });
+    }, 2200);
+
+    // Progress the timeline steps
+    const stepIv = setInterval(() => {
+      setCompletedSteps((prev) => {
+        if (prev < 5) return prev + 1;
+        return prev;
+      });
+    }, 3500);
+
+    // Mark as done after all messages have cycled
+    const doneTimer = setTimeout(() => {
+      setGenDone(true);
+    }, GEN_MESSAGES.length * 2200 + 1000);
+
+    return () => {
+      clearInterval(msgIv);
+      clearInterval(stepIv);
+      clearTimeout(doneTimer);
+    };
+  }, [step]);
 
   /* ═══════════════════════════ RENDER ═══════════════════════════ */
   return (
@@ -425,162 +346,11 @@ export function LandingFunnel() {
         </section>
       )}
 
-      {/* ════════════════════ STEP 2: LOADING & SCRAPED DATA ════════════════════ */}
+      {/* ════════════════════ STEP 2: EMAIL ════════════════════ */}
       {step === 2 && (
         <section className="animate-fade-up min-h-screen px-6 pb-20 pt-[120px]">
-          <div className="mx-auto max-w-[640px] text-center">
-            <StepsBar current={2} />
-
-            {/* AI activity scanner */}
-            {isScanning && (
-              <div className="mx-auto mb-10 max-w-[480px] overflow-hidden rounded-card bg-white p-8 shadow-cardLg">
-                <div className="mb-6 flex items-center gap-3 border-b border-brand-grey200 pb-4">
-                  <div className="h-3 w-3 animate-pulse rounded-full bg-brand-teal" />
-                  <div>
-                    <div className="text-sm font-semibold text-brand-dark">
-                      Analysing your listing
-                    </div>
-                    <div className="text-xs text-brand-grey400">{scanStatus}</div>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2.5">
-                  <div className="scan-line" />
-                  <div className="scan-line" />
-                  <div className="scan-line" />
-                  <div className="scan-line" />
-                </div>
-              </div>
-            )}
-
-            {/* Scraped preview card */}
-            {scrapeReady && (
-              <div className="animate-fade-up mb-8 rounded-card bg-white p-7 text-left shadow-card">
-                {/* Hero image */}
-                {session.hero_image_url && (
-                  <div className="mb-5 h-[200px] overflow-hidden rounded-input bg-gradient-to-br from-brand-tealLight to-brand-grey200">
-                    <img
-                      src={session.hero_image_url}
-                      alt="Property"
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                )}
-                {!session.hero_image_url && (
-                  <div className="mb-5 h-[200px] rounded-input bg-gradient-to-br from-brand-tealLight to-brand-grey200" />
-                )}
-
-                {/* Host */}
-                <div className="mb-4 flex items-center gap-3.5">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-brand-teal to-brand-tealDark text-lg font-bold text-white">
-                    {session.profile_image_url ? (
-                      <img
-                        src={session.profile_image_url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      session.host_name.charAt(0).toUpperCase()
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-base font-semibold">
-                      {session.host_name}
-                    </div>
-                    {session.superhost && (
-                      <span className="inline-block rounded-full bg-brand-tealLight px-2.5 py-0.5 text-[11px] font-semibold text-brand-tealDark">
-                        &#9733; Superhost
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Property name */}
-                <div className="mb-2 font-serif text-[22px] font-semibold">
-                  {session.property_name}
-                </div>
-
-                {/* Stats */}
-                <div className="flex flex-wrap gap-4 text-[13px] text-brand-grey600">
-                  {session.avg_rating > 0 && (
-                    <>
-                      <span>
-                        &#9733; {session.avg_rating} ({session.reviews_count}{" "}
-                        reviews)
-                      </span>
-                      <span>&middot;</span>
-                    </>
-                  )}
-                  <span>
-                    {session.bedrooms} bed &middot; {session.bathrooms} bath
-                  </span>
-                  <span>&middot;</span>
-                  <span>{session.max_guests} guests</span>
-                </div>
-              </div>
-            )}
-
-            {/* Platform expand */}
-            {scrapeReady && (
-              <div className="animate-fade-up mb-8 rounded-card bg-white p-7 text-left shadow-card">
-                <h3 className="mb-1.5 text-base font-semibold">
-                  List on other platforms?
-                </h3>
-                <p className="mb-5 text-[13px] text-brand-grey400">
-                  Add more URLs for a cross-platform consistency check in your
-                  report.
-                </p>
-                <input
-                  type="text"
-                  value={bookingUrl}
-                  onChange={(e) => setBookingUrl(e.target.value)}
-                  placeholder="Booking.com listing URL (optional)"
-                  className="mb-3 w-full rounded-input border-[1.5px] border-brand-grey200 bg-brand-mist px-4 py-3.5 font-sans text-sm outline-none transition-colors focus:border-brand-teal focus:bg-white"
-                />
-                <input
-                  type="text"
-                  value={vrboUrl}
-                  onChange={(e) => setVrboUrl(e.target.value)}
-                  placeholder="VRBO listing URL (optional)"
-                  className="mb-3 w-full rounded-input border-[1.5px] border-brand-grey200 bg-brand-mist px-4 py-3.5 font-sans text-sm outline-none transition-colors focus:border-brand-teal focus:bg-white"
-                />
-                <input
-                  type="text"
-                  value={websiteUrl}
-                  onChange={(e) => setWebsiteUrl(e.target.value)}
-                  placeholder="Your personal website URL (optional)"
-                  className="w-full rounded-input border-[1.5px] border-brand-grey200 bg-brand-mist px-4 py-3.5 font-sans text-sm outline-none transition-colors focus:border-brand-teal focus:bg-white"
-                />
-              </div>
-            )}
-
-            {/* Continue button */}
-            {scrapeReady && (
-              <button
-                onClick={() => goToStep(3)}
-                className="inline-flex items-center gap-2 rounded-xl bg-brand-red px-10 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.98]"
-              >
-                Continue
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </button>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* ════════════════════ STEP 3: EMAIL ════════════════════ */}
-      {step === 3 && (
-        <section className="animate-fade-up min-h-screen px-6 pb-20 pt-[120px]">
           <div className="mx-auto max-w-[480px] text-center">
-            <StepsBar current={3} />
+            <StepsBar current={2} />
 
             {/* Free badge */}
             <div className="mb-5 inline-flex items-center gap-1.5 rounded-full bg-[#e8f9e8] px-3.5 py-1.5 text-xs font-semibold text-[#2a8a2a]">
@@ -599,32 +369,12 @@ export function LandingFunnel() {
 
             {/* Email card */}
             <div className="rounded-card bg-white p-10 text-left shadow-cardLg max-sm:px-6 max-sm:py-7">
-              {/* Personalised greeting */}
-              {session.host_name && (
-                <div className="mb-6 flex items-center gap-3 rounded-input bg-brand-tealLight p-3.5">
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-teal text-sm font-bold text-white">
-                    {session.profile_image_url ? (
-                      <img
-                        src={session.profile_image_url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      session.host_name.charAt(0)
-                    )}
-                  </div>
-                  <div className="text-sm font-medium text-brand-tealDark">
-                    Hi {session.host_name}, your free listing review is ready
-                  </div>
-                </div>
-              )}
-
               <h2 className="mb-2 font-serif text-[26px] font-semibold">
-                Almost there
+                Where should we send it?
               </h2>
               <p className="mb-7 text-sm leading-relaxed text-brand-grey600">
-                We&apos;ll email your free report as a PDF&nbsp;&mdash; it only
-                takes a moment.
+                We&apos;ll review your listing with AI and email you a
+                professional PDF report&nbsp;&mdash; completely free.
               </p>
 
               <label className="mb-1.5 block text-[13px] font-semibold text-brand-dark">
@@ -680,84 +430,142 @@ export function LandingFunnel() {
         </section>
       )}
 
-      {/* ════════════════════ STEP 4: CONFIRMATION ════════════════════ */}
-      {step === 4 && (
+      {/* ════════════════════ STEP 3: AI GENERATING + CONFIRMATION ════════════════════ */}
+      {step === 3 && (
         <section className="animate-fade-up min-h-screen px-6 pb-20 pt-[120px]">
           <div className="mx-auto max-w-[560px] text-center">
-            <StepsBar current={4} />
+            <StepsBar current={3} />
 
-            {/* Checkmark */}
-            <div className="mx-auto mb-7 flex h-20 w-20 animate-confirm-pop items-center justify-center rounded-full bg-brand-teal">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="2.5"
-                className="h-9 w-9"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            </div>
+            {/* Animated AI generation graphic */}
+            {!genDone && (
+              <div className="mb-8">
+                {/* Pulsing brain/AI icon */}
+                <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-brand-teal to-brand-tealDark shadow-lg">
+                  <div className="animate-spin-slow">
+                    <svg
+                      width="44"
+                      height="44"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.57-3.24 3.92a.5.5 0 0 0-.38.61l.5 2.47" />
+                      <path d="M8.56 6.44a4 4 0 0 1 .74-5.13" />
+                      <path d="M15.44 6.44a4 4 0 0 0-.74-5.13" />
+                      <circle cx="12" cy="17" r="3" />
+                      <path d="M12 20v2" />
+                      <path d="M6.5 8.5C3.58 9.45 2 11.6 2 14a5 5 0 0 0 5 5" />
+                      <path d="M17.5 8.5c2.92.95 4.5 3.1 4.5 5.5a5 5 0 0 1-5 5" />
+                    </svg>
+                  </div>
+                </div>
 
-            <h2 className="mb-3 font-serif text-[32px] font-bold">
-              Your free report is on its way
-            </h2>
-            <p className="mb-10 text-base leading-relaxed text-brand-grey600">
-              We&apos;re generating your personalised listing review right now.
-              <br />
-              Check your inbox shortly.
-            </p>
+                <h2 className="mb-2 font-serif text-[28px] font-bold text-brand-dark">
+                  Generating your report
+                </h2>
+                <p className="mb-8 text-sm text-brand-grey600">
+                  Our AI is analysing your listing right now.
+                  <br />
+                  This usually takes a couple of minutes.
+                </p>
 
-            {/* Timeline card */}
-            <div className="mb-7 rounded-card bg-white p-8 text-left shadow-card">
-              <h3 className="mb-4 flex items-center gap-2 text-[15px] font-semibold">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-                What&apos;s happening now
-              </h3>
-              <div className="flex flex-col gap-3.5">
-                <TimelineItem status="done" text="Listing data scraped" />
-                <TimelineItem
-                  status="done"
-                  text="Content, amenities & pricing extracted"
-                />
-                <TimelineItem
-                  status="active"
-                  text="AI analysing against best practices\u2026"
-                />
-                <TimelineItem
-                  status="pending"
-                  text="Generating your PDF report"
-                />
-                <TimelineItem
-                  status="pending"
-                  text="Sending to your inbox"
-                />
+                {/* Animated status ticker */}
+                <div className="mx-auto mb-8 max-w-[420px] overflow-hidden rounded-card bg-white p-6 shadow-card">
+                  <div className="mb-4 flex items-center gap-3 border-b border-brand-grey200 pb-3">
+                    <div className="h-3 w-3 animate-pulse rounded-full bg-brand-teal" />
+                    <div className="text-sm font-semibold text-brand-dark">
+                      {GEN_MESSAGES[genMsgIndex]}
+                    </div>
+                  </div>
+
+                  {/* Animated scan lines */}
+                  <div className="flex flex-col gap-2.5">
+                    <div className="scan-line" />
+                    <div className="scan-line" />
+                    <div className="scan-line" />
+                    <div className="scan-line" />
+                  </div>
+                </div>
+
+                {/* Progress timeline */}
+                <div className="mx-auto max-w-[380px] rounded-card bg-white p-6 text-left shadow-card">
+                  <div className="flex flex-col gap-3">
+                    <TimelineItem
+                      status={completedSteps >= 1 ? "done" : "active"}
+                      text="Scraping listing data"
+                    />
+                    <TimelineItem
+                      status={completedSteps >= 2 ? "done" : completedSteps >= 1 ? "active" : "pending"}
+                      text="Extracting content & amenities"
+                    />
+                    <TimelineItem
+                      status={completedSteps >= 3 ? "done" : completedSteps >= 2 ? "active" : "pending"}
+                      text="AI analysing against best practices"
+                    />
+                    <TimelineItem
+                      status={completedSteps >= 4 ? "done" : completedSteps >= 3 ? "active" : "pending"}
+                      text="Writing optimised copy"
+                    />
+                    <TimelineItem
+                      status={completedSteps >= 5 ? "done" : completedSteps >= 4 ? "active" : "pending"}
+                      text="Building & sending your PDF"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Upsell banner */}
-            <div className="rounded-card bg-gradient-to-br from-brand-dark to-brand-darkMid p-8 text-center text-white">
-              <h3 className="mb-2 font-serif text-xl font-semibold">
-                Get 30% off your next review
-              </h3>
-              <p className="mb-5 text-sm opacity-70">
-                Start a free Hello Hosty trial and unlock member pricing on
-                every listing review.
-              </p>
-              <button className="rounded-input bg-brand-teal px-7 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-tealDark">
-                Start free trial
-              </button>
-            </div>
+            {/* Confirmation — shown after animation completes */}
+            {genDone && (
+              <div className="animate-fade-up">
+                {/* Checkmark */}
+                <div className="mx-auto mb-7 flex h-20 w-20 animate-confirm-pop items-center justify-center rounded-full bg-brand-teal">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2.5"
+                    className="h-9 w-9"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+
+                <h2 className="mb-3 font-serif text-[32px] font-bold">
+                  Your report is on its way
+                </h2>
+                <p className="mb-10 text-base leading-relaxed text-brand-grey600">
+                  We&apos;ve sent your personalised listing review to{" "}
+                  <span className="font-semibold text-brand-dark">
+                    {session.email}
+                  </span>
+                  .<br />
+                  Check your inbox shortly.
+                </p>
+
+                {/* Upsell banner */}
+                <div className="rounded-card bg-gradient-to-br from-brand-dark to-brand-darkMid p-8 text-center text-white">
+                  <h3 className="mb-2 font-serif text-xl font-semibold">
+                    Want to optimise your other listings?
+                  </h3>
+                  <p className="mb-5 text-sm opacity-70">
+                    Check out what else Hello Hosty can do for your hosting
+                    business.
+                  </p>
+                  <a
+                    href="https://hellohosty.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block rounded-input bg-brand-teal px-7 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-tealDark"
+                  >
+                    Explore HelloHosty
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -798,18 +606,28 @@ function TimelineItem({
   text: string;
 }) {
   return (
-    <div className="flex items-center gap-3.5 text-sm text-brand-grey600">
+    <div className={`flex items-center gap-3.5 text-sm transition-all duration-500 ${
+      status === "done"
+        ? "text-brand-teal"
+        : status === "active"
+          ? "text-brand-dark font-medium"
+          : "text-brand-grey400"
+    }`}>
       <div
-        className={`flex-shrink-0 rounded-full ${
+        className={`flex-shrink-0 rounded-full transition-all duration-500 ${
           status === "done"
-            ? "h-2 w-2 bg-brand-teal"
+            ? "h-2.5 w-2.5 bg-brand-teal"
             : status === "active"
-              ? "h-2.5 w-2.5 animate-pulse bg-brand-teal"
+              ? "h-3 w-3 animate-pulse bg-brand-teal"
               : "h-2 w-2 bg-brand-grey200"
         }`}
       />
       {text}
-      {status === "done" && " \u2713"}
+      {status === "done" && (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="ml-auto flex-shrink-0">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      )}
     </div>
   );
 }
