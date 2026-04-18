@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   title: "Free AI Listing Review | Hello Hosty",
   description:
     "Hello Hosty reviews your Airbnb listing and delivers a free professional report with scores, quick wins, and ready-to-paste optimised copy — in seconds.",
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
