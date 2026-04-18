@@ -1139,7 +1139,26 @@ def scrape(url: str, headless: bool = True, timeout_ms: int = 30000) -> dict:
                     return Array.from(cards).map(c => {
                         const reviewer = (c.querySelector('h2, h3, [data-testid="review-user-name"]') || {}).textContent || '';
                         const date = (c.querySelector('time, [data-testid="review-date"]') || {}).textContent || '';
-                        const text = (c.querySelector('span[dir="ltr"], div[dir="ltr"], [data-testid="review-text"]') || {}).textContent || '';
+                        // Try dir="ltr" first, then fall back to finding the longest leaf text
+                        let textEl = c.querySelector('span[dir="ltr"], div[dir="ltr"], [data-testid="review-text"]');
+                        let text = textEl ? (textEl.textContent || '').trim() : '';
+                        if (!text) {
+                            // Fallback: find the longest leaf-ish text that isn't the reviewer name
+                            const candidates = Array.from(c.querySelectorAll('span, div'))
+                                .filter(el => {
+                                    const t = (el.textContent || '').trim();
+                                    return t.length > 30 && el.children.length <= 1
+                                        && !el.querySelector('h2,h3,img,a');
+                                })
+                                .sort((a, b) => b.textContent.length - a.textContent.length);
+                            for (const el of candidates) {
+                                const t = (el.textContent || '').trim();
+                                if (!t.startsWith(reviewer) || t.length > reviewer.length + 50) {
+                                    text = t;
+                                    break;
+                                }
+                            }
+                        }
                         return { reviewer: reviewer.trim(), date: date.trim(), text: text.trim(), rating: null };
                     }).filter(r => r.text.length > 10);
                 }"""
