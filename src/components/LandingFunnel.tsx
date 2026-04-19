@@ -439,27 +439,17 @@ export function LandingFunnel() {
             {/* Animated AI generation graphic */}
             {!genDone && (
               <div className="mb-8">
-                {/* Pulsing brain/AI icon */}
-                <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-brand-teal to-brand-tealDark shadow-lg">
+                {/* HelloHosty icon, spinning slowly inside a circle */}
+                <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg">
                   <div className="animate-spin-slow">
-                    <svg
-                      width="44"
-                      height="44"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.57-3.24 3.92a.5.5 0 0 0-.38.61l.5 2.47" />
-                      <path d="M8.56 6.44a4 4 0 0 1 .74-5.13" />
-                      <path d="M15.44 6.44a4 4 0 0 0-.74-5.13" />
-                      <circle cx="12" cy="17" r="3" />
-                      <path d="M12 20v2" />
-                      <path d="M6.5 8.5C3.58 9.45 2 11.6 2 14a5 5 0 0 0 5 5" />
-                      <path d="M17.5 8.5c2.92.95 4.5 3.1 4.5 5.5a5 5 0 0 1-5 5" />
-                    </svg>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/hellohosty-icon-teal.png"
+                      alt="Hello Hosty"
+                      width={80}
+                      height={80}
+                      className="h-20 w-20"
+                    />
                   </div>
                 </div>
 
