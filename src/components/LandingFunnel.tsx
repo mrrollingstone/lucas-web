@@ -26,6 +26,14 @@ const initialSession: SessionData = {
   submitted_at: null,
 };
 
+/* ─── Meta Pixel helper — no-ops if fbq isn't on the page ─── */
+type FbqFn = (...args: unknown[]) => void;
+function fbqTrack(event: string, params?: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
+  const fbq = (window as unknown as { fbq?: FbqFn }).fbq;
+  if (typeof fbq === "function") fbq("track", event, params || {});
+}
+
 /* ─── Step-dot progress bar ─── */
 function StepsBar({ current }: { current: 1 | 2 | 3 }) {
   return (
@@ -75,6 +83,23 @@ export function LandingFunnel() {
   const [emailValue, setEmailValue] = useState("");
   const [emailError, setEmailError] = useState(false);
 
+  /* Summit-campaign arrivals (?email=…&utm_source=summit) */
+  const [isSummitLead, setIsSummitLead] = useState(false);
+  const [emailPrefilled, setEmailPrefilled] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const qEmail = params.get("email");
+    const qSource = params.get("utm_source");
+    if (qEmail && qEmail.includes("@") && qEmail.includes(".")) {
+      setEmailValue(qEmail);
+      setSession((s) => ({ ...s, email: qEmail }));
+      setEmailPrefilled(true);
+    }
+    if (qSource === "summit") setIsSummitLead(true);
+  }, []);
+
   /* Step 3 — generation animation */
   const [genMsgIndex, setGenMsgIndex] = useState(0);
   const [genDone, setGenDone] = useState(false);
@@ -97,7 +122,7 @@ export function LandingFunnel() {
     [],
   );
 
-  /* ─── Step 1 → 2: Submit URL ─── */
+  /* ─── Step 1 → 2 (or straight to 3 for summit leads with pre-filled email) ─── */
   const submitUrl = useCallback(() => {
     const url = urlValue.trim();
     if (!url || (!url.includes("airbnb") && !url.includes("abnb"))) {
@@ -106,8 +131,38 @@ export function LandingFunnel() {
     }
     setUrlError(false);
     setSession((s) => ({ ...s, listing_url: url }));
+
+    // Email already supplied via ?email= (summit-campaign landing): skip Step 2
+    // and submit directly to the pipeline.
+    if (emailPrefilled && emailValue) {
+      const now = new Date().toISOString();
+      const payload = {
+        email: emailValue,
+        listing_url: url,
+        platform: session.platform,
+        is_first_time: true,
+        submitted_at: now,
+        ...(isSummitLead ? { utm_source: "summit" } : {}),
+      };
+      setSession((s) => ({ ...s, email: emailValue, submitted_at: now }));
+      fetch("/api/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+      // Summit users already Lead'd on Meta's Instant Form — fire
+      // CompleteRegistration to avoid double-counting the Lead event.
+      if (isSummitLead) {
+        fbqTrack("CompleteRegistration", { content_name: "lucas-summit-url-submit" });
+      } else {
+        fbqTrack("Lead", { content_name: "lucas-free-review" });
+      }
+      goToStep(3);
+      return;
+    }
+
     goToStep(2);
-  }, [urlValue, goToStep]);
+  }, [urlValue, goToStep, emailPrefilled, emailValue, isSummitLead, session.platform]);
 
   /* ─── Step 2 → 3: Submit email & start pipeline ─── */
   const submitEmail = useCallback(async () => {
@@ -135,6 +190,9 @@ export function LandingFunnel() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }).catch(() => {});
+
+    // Meta Pixel: standard Lead event on email capture
+    fbqTrack("Lead", { content_name: "lucas-free-review" });
 
     goToStep(3);
   }, [emailValue, session, goToStep]);
