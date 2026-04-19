@@ -149,7 +149,7 @@ ANALYSIS_SCHEMA_NOTE = """Analyse the listing and return this exact JSON shape:
 
   "missing_amenities": [
     {
-      "amenity": "name of the amenity",
+      "amenity": "name of the amenity — MUST be an actual selectable amenity in Airbnb's listing editor",
       "competitor_pct": "estimated percentage of comparable top-rated listings that include this (e.g. '87%')",
       "reason": "why adding this would help (e.g. 'appears in guest search filters, missing it costs you visibility')"
     }
@@ -182,6 +182,25 @@ Rules:
 - Keep the host's voice when rewriting — optimise, don't replace. Reference their existing description when rewriting.
 - If the listing has an existing description, your optimised version MUST build on it, not discard it. Preserve unique details, personality, and specific features the host mentions.
 - Scores: return null ONLY for pricing (if no price visible) and response (if no response-time data). For all other categories (content, photos, amenities, seo), you MUST provide a score based on your assessment — these can always be evaluated from the listing data.
+- MISSING AMENITIES — ONLY suggest amenities that are actual selectable checkboxes in
+  Airbnb's listing editor. NEVER suggest features like "Rooftop", "City views",
+  "Terrace", "Garden", "Balcony views", "Skyline" or similar — these are property
+  features to mention in the description, NOT tickable amenities on the platform.
+  Valid Airbnb amenities include (non-exhaustive): WiFi, TV, Kitchen, Washer, Dryer,
+  Free parking on premises, Paid parking on premises, Air conditioning, Heating,
+  Dedicated workspace, Hair dryer, Iron, Hangers, Bed linens, Extra pillows and blankets,
+  Shampoo, Body soap, Shower gel, Hot water, Essentials, Smoke alarm, Carbon monoxide alarm,
+  Fire extinguisher, First aid kit, Lock on bedroom door, Self check-in, Lockbox, Keypad,
+  Smart lock, Pool, Hot tub, BBQ grill, Outdoor dining area, Patio or balcony, Backyard,
+  Fire pit, Indoor fireplace, EV charger, Gym, Exercise equipment, Pack 'n play/Travel crib,
+  High chair, Children's books and toys, Baby bath, Baby monitor, Crib, Changing table,
+  Books and reading material, Board games, Luggage dropoff allowed, Long term stays allowed,
+  Coffee maker, Microwave, Dishes and silverware, Dishwasher, Stove, Oven, Refrigerator,
+  Freezer, Toaster, Blender, Cleaning products, Room-darkening shades, Clothing storage,
+  Ethernet connection, Portable fans, Ceiling fan, Security cameras on property,
+  Breakfast, Waterfront, Beachfront, Ski-in/ski-out, Mountain view, Lake view, Garden view,
+  Ocean view, City skyline view, Courtyard view, Resort access, Beach access.
+  If in doubt whether something is a real Airbnb amenity, do not suggest it.
 - For guest rating breakdown fields (cleanliness, accuracy, checkin, communication, location, value): pass through the exact platform data. Return null only if the platform data genuinely does not include that field.
 - Optimised copy fields: you MUST generate content for optimised_description, optimised_space, and optimised_neighbourhood whenever there is sufficient location/property data. Only return empty string for fields where you truly have no relevant information.
 - listing_quality assessments: ALWAYS provide a substantive assessment for each field. Reference specific details from the scraped data. Never return an empty or generic assessment.
