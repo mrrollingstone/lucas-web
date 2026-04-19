@@ -470,7 +470,7 @@ REQUIRED_LQ_KEYS = {"title", "photos", "description", "amenities", "host_profile
 # Patterns that flag a non-actionable, platform-computed metric recommendation.
 _BANNED_PATTERNS = re.compile(
     r"response\s+rate|response\s+time|superhost\s+status|review\s+score",
-    _re.IGNORECASE,
+    re.IGNORECASE,
 )
 
 
