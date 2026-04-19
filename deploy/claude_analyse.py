@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import date
 from typing import Any
@@ -166,11 +167,15 @@ Airbnb character limits (MUST be respected in all optimised copy):
   - Getting around: 500 characters
 
 Rules:
-- ONLY recommend things the host can directly change on their listing page. DO NOT
-  recommend changes to metrics that Airbnb calculates automatically, including:
-  host response rate, host response time, Superhost status, review scores, or
-  any other platform-computed statistic. These are outcomes, not listing edits.
-  Focus quick_wins and priority_improvements on listing content the host controls:
+- BANNED TOPICS IN quick_wins AND priority_improvements — NEVER include any of these:
+  * Host response rate (Airbnb-calculated, host cannot edit)
+  * Host response time (Airbnb-calculated, host cannot edit)
+  * Superhost status (Airbnb-calculated, host cannot edit)
+  * Review scores (Airbnb-calculated, host cannot edit)
+  * Any other platform-computed statistic
+  If you include "response rate", "response time", or "Superhost" in ANY quick_win
+  or priority_improvement title or description, the output is INVALID. These are
+  metrics hosts cannot control. Focus ONLY on listing content the host can edit:
   title, description, photos, amenities list, pricing, house rules, etc.
 - Never invent review quotes. Only use evidence that actually appears in the data.
 - Every recommendation must include the EXACT text to use or the EXACT action to take. Never give vague advice like "make the title more descriptive" — instead provide the actual new title.
@@ -462,6 +467,28 @@ REQUIRED_QW_KEYS = {"title", "description", "estimated_time", "expected_impact"}
 REQUIRED_LQ_KEYS = {"title", "photos", "description", "amenities", "host_profile"}
 
 
+# Patterns that flag a non-actionable, platform-computed metric recommendation.
+_BANNED_PATTERNS = re.compile(
+    r"response\s+rate|response\s+time|superhost\s+status|review\s+score",
+    _re.IGNORECASE,
+)
+
+
+def sanitise_analysis(analysis: dict) -> dict:
+    """Strip quick_wins / priority_improvements that reference banned metrics."""
+    for key in ("quick_wins", "priority_improvements"):
+        items = analysis.get(key)
+        if not items:
+            continue
+        analysis[key] = [
+            item for item in items
+            if not _BANNED_PATTERNS.search(
+                (item.get("title") or "") + " " + (item.get("description") or "")
+            )
+        ]
+    return analysis
+
+
 def validate_analysis(analysis: dict) -> list[str]:
     """Return a list of human-readable validation errors (empty = valid)."""
     errs: list[str] = []
@@ -475,8 +502,8 @@ def validate_analysis(analysis: dict) -> list[str]:
         errs.append(f"missing scores keys: {sorted(missing_scores)}")
 
     qw = analysis.get("quick_wins") or []
-    if not (3 <= len(qw) <= 5):
-        errs.append(f"quick_wins should have 3-5 items, got {len(qw)}")
+    if not (2 <= len(qw) <= 5):
+        errs.append(f"quick_wins should have 2-5 items, got {len(qw)}")
     for i, item in enumerate(qw):
         missing = REQUIRED_QW_KEYS - set((item or {}).keys())
         if missing:
@@ -527,6 +554,8 @@ def main(argv: list[str]) -> int:
     except Exception as e:
         print(json.dumps({"status": "error", "message": str(e)}))
         return 1
+
+    analysis = sanitise_analysis(analysis)
 
     errs = validate_analysis(analysis)
     if errs:
