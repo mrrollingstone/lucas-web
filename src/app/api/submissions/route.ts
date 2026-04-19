@@ -2,28 +2,40 @@
  * POST /api/submissions
  *
  * Accepts the full session payload from the landing funnel after step 3.
- * 1. Forwards to n8n webhook (which persists to Airtable or Postgres)
- * 2. Tags the email in Mailchimp with `lucas-first-review`
- * 3. Kicks off the report generation pipeline via n8n
+ * 1. Scrapes the Airbnb listing title (so the welcome email reads naturally)
+ * 2. Sends an immediate "Hey there, thanks for trying Lucas" email via Resend
+ *    using the scraped property title — replaces the previous n8n lucas-drip
+ *    webhook which sent the same email but with the raw URL embedded.
+ * 3. Forwards to n8n webhook (which kicks off the report-generation pipeline)
+ * 4. Tags the email in Mailchimp with `lucas-first-review` (drives the 24h+ drip)
  *
  * Env vars required:
+ *   RESEND_API_KEY         — for the welcome email
  *   N8N_BASE_URL, N8N_WEBHOOK_TOKEN
- *   MAILCHIMP_API_KEY, MAILCHIMP_LIST_ID (audience ID)
+ *   MAILCHIMP_API_KEY, MAILCHIMP_LIST_ID
  */
 import { NextRequest, NextResponse } from "next/server";
 import mailchimp from "@mailchimp/mailchimp_marketing";
+import { Resend } from "resend";
 import crypto from "crypto";
 
 /* ── Env ── */
 const N8N_URL = process.env.N8N_BASE_URL;
 const N8N_TOKEN = process.env.N8N_WEBHOOK_TOKEN;
 const MC_API_KEY = process.env.MAILCHIMP_API_KEY;
-const MC_LIST_ID = process.env.MAILCHIMP_LIST_ID; // Audience / list ID
-const MC_SERVER = MC_API_KEY?.split("-").pop() || "us1"; // e.g. "us21"
+const MC_LIST_ID = process.env.MAILCHIMP_LIST_ID;
+const MC_SERVER = MC_API_KEY?.split("-").pop() || "us1";
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 if (MC_API_KEY) {
   mailchimp.setConfig({ apiKey: MC_API_KEY, server: MC_SERVER });
 }
+
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+
+/* ── Brand colours (mirrors tailwind.config + email_templates.py) ── */
+const BRAND_TEAL = "#2BB5B2";
+const BRAND_INK = "#1F2933";
 
 /* ── Payload shape from the frontend ── */
 interface SubmissionPayload {
@@ -63,28 +75,141 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-real-ip") ||
     "unknown";
 
-  /* ── 1. Forward to n8n — stores submission + kicks off report pipeline ── */
+  /* ── 1. Scrape the listing title (best-effort, ~10s budget) ── */
+  const propertyTitle =
+    body.property_name?.trim() ||
+    (await fetchListingTitle(body.listing_url)) ||
+    "your listing";
+
+  /* ── 2. Send the immediate welcome email (uses the scraped title) ── */
+  const welcomeOk = await sendWelcomeEmail(body.email, propertyTitle);
+
+  /* ── 3. Forward to n8n — kicks off the report-generation pipeline ── */
   const n8nOk = await forwardToN8n({ ...body, ip });
 
-  /* ── 2. Tag in Mailchimp with `lucas-first-review` ── */
+  /* ── 4. Tag in Mailchimp with `lucas-first-review` for the 24h+ drip ── */
   const mcOk = await tagInMailchimp(body.email, body.host_name);
 
-  /* ── 3. Trigger drip email sequence via n8n ── */
-  const dripOk = await triggerDrip(body.email, body.host_name, body.listing_url);
-
   console.log(
-    `📋 Submission: email=${body.email} listing=${body.listing_url} n8n=${n8nOk ? "ok" : "fail"} mc=${mcOk ? "ok" : "fail"} drip=${dripOk ? "ok" : "fail"}`,
+    `📋 Submission: email=${body.email} listing=${body.listing_url} title="${propertyTitle}" welcome=${welcomeOk ? "ok" : "fail"} n8n=${n8nOk ? "ok" : "fail"} mc=${mcOk ? "ok" : "fail"}`,
   );
 
   return NextResponse.json({
     ok: true,
+    welcome: welcomeOk ? "sent" : "unavailable",
     n8n: n8nOk ? "forwarded" : "unavailable",
     mailchimp: mcOk ? "tagged" : "unavailable",
-    drip: dripOk ? "triggered" : "unavailable",
+    title: propertyTitle,
   });
 }
 
-/* ── n8n forwarding ── */
+/* ── Title scrape: ask the existing n8n scraper for the listing title.
+ *    Falls back to the URL host if the scraper is slow or unreachable. ── */
+async function fetchListingTitle(url: string): Promise<string | null> {
+  if (!N8N_URL || !N8N_TOKEN) return null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10_000); // 10s budget — keep submission snappy
+    const res = await fetch(`${N8N_URL}/webhook/lucas/scrape`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-lucas-token": N8N_TOKEN,
+      },
+      body: JSON.stringify({ url, platform: "airbnb", title_only: true }),
+      signal: ctrl.signal,
+      cache: "no-store",
+    });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const data: any = await res.json().catch(() => ({}));
+    const title: string | undefined =
+      data?.content?.title || data?.property?.name || data?.title;
+    if (title && typeof title === "string" && title.trim().length > 0) {
+      return title.trim();
+    }
+    return null;
+  } catch (err: any) {
+    console.warn("Title scrape failed:", err.message);
+    return null;
+  }
+}
+
+/* ── Welcome email via Resend ── */
+async function sendWelcomeEmail(
+  toEmail: string,
+  propertyTitle: string,
+): Promise<boolean> {
+  if (!resend) {
+    console.warn("Resend not configured — skipping welcome email");
+    return false;
+  }
+  const safeTitle = escapeHtml(propertyTitle);
+  const html = `
+    <!doctype html>
+    <html lang="en-GB">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width">
+        <title>Thanks for trying Lucas</title>
+      </head>
+      <body style="margin:0;padding:0;background:#F2F2F2;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:${BRAND_INK};">
+        <span style="display:none !important;opacity:0;color:transparent;height:0;width:0;">Your AI listing review is being generated now — usually 2-4 minutes.</span>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2F2F2;padding:32px 0;">
+          <tr><td align="center">
+            <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:560px;">
+              <tr><td style="background:${BRAND_TEAL};padding:18px 28px;color:#ffffff;font-weight:700;font-size:14px;letter-spacing:0.5px;">
+                HELLOHOSTY · AI LISTING REVIEW
+              </td></tr>
+              <tr><td style="padding:28px;font-size:15px;line-height:1.55;">
+                <p style="margin:0 0 14px;color:${BRAND_TEAL};font-weight:600;">Hey there,</p>
+                <p style="margin:0 0 14px;">Thanks for trying Lucas, your AI listing review for <strong>${safeTitle}</strong>.</p>
+                <p style="margin:0 0 14px;">Our AI is analysing your listing right now — scoring it against best practice, finding the quick wins, and writing optimised copy you can paste straight back into Airbnb.</p>
+                <p style="margin:0 0 14px;">Your full PDF report will land in this inbox within the next few minutes. If it doesn't show up, check your spam folder and add <a href="mailto:lucas@hellohosty.com" style="color:${BRAND_TEAL};">lucas@hellohosty.com</a> to your contacts so the next ones come through cleanly.</p>
+                <p style="margin:18px 0 0;">— The HelloHosty team</p>
+              </td></tr>
+              <tr><td style="background:#F8FAFA;padding:18px 28px;font-size:12px;color:#667085;text-align:center;">
+                You're receiving this because you requested a free AI listing review at lucas.hellohosty.com.<br>
+                HelloHosty · <a href="mailto:lucas@hellohosty.com" style="color:#667085;">lucas@hellohosty.com</a> · <a href="https://hellohosty.com" style="color:#667085;">hellohosty.com</a>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+    </html>
+  `;
+
+  const text =
+    `Hey there,\n\n` +
+    `Thanks for trying Lucas, your AI listing review for ${propertyTitle}.\n\n` +
+    `Our AI is analysing your listing right now — scoring it against best practice, ` +
+    `finding the quick wins, and writing optimised copy you can paste straight back into Airbnb.\n\n` +
+    `Your full PDF report will land in this inbox within the next few minutes. ` +
+    `If it doesn't show up, check your spam folder and add lucas@hellohosty.com to your contacts.\n\n` +
+    `— The HelloHosty team\n`;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: "Lucas at HelloHosty <lucas@notify.hellohosty.com>",
+      to: [toEmail],
+      replyTo: "lucas@hellohosty.com",
+      subject: `Your Lucas review of ${propertyTitle} is on its way`,
+      html,
+      text,
+      headers: { "X-Entity-Ref-ID": `lucas-welcome-${Date.now()}` },
+    });
+    if (error) {
+      console.error("Resend welcome email failed:", error);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.error("Resend welcome email exception:", err.message);
+    return false;
+  }
+}
+
+/* ── n8n forwarding (report pipeline) ── */
 async function forwardToN8n(
   payload: SubmissionPayload & { ip: string },
 ): Promise<boolean> {
@@ -113,31 +238,7 @@ async function forwardToN8n(
   }
 }
 
-/* ── Drip: trigger the 3-email nurture sequence via n8n ── */
-async function triggerDrip(
-  email: string,
-  name: string,
-  listingUrl: string,
-): Promise<boolean> {
-  if (!N8N_URL) {
-    console.warn("n8n not configured — skipping drip trigger");
-    return false;
-  }
-  try {
-    const res = await fetch(`${N8N_URL}/webhook/lucas-drip`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name: name || "", listingUrl }),
-      cache: "no-store",
-    });
-    return res.ok;
-  } catch (err: any) {
-    console.error("Drip trigger failed:", err.message);
-    return false;
-  }
-}
-
-/* ── Mailchimp: upsert contact + apply tag ── */
+/* ── Mailchimp: upsert contact + apply tag (drives the 24h+ drip) ── */
 async function tagInMailchimp(
   email: string,
   firstName: string,
@@ -153,7 +254,6 @@ async function tagInMailchimp(
     .digest("hex");
 
   try {
-    // Upsert the contact (add or update)
     await mailchimp.lists.setListMember(MC_LIST_ID, subscriberHash, {
       email_address: email.toLowerCase(),
       status_if_new: "subscribed" as const,
@@ -162,7 +262,6 @@ async function tagInMailchimp(
       },
     });
 
-    // Apply the lucas-first-review tag
     await mailchimp.lists.updateListMemberTags(MC_LIST_ID, subscriberHash, {
       tags: [{ name: "lucas-first-review", status: "active" as const }],
     });
@@ -175,4 +274,14 @@ async function tagInMailchimp(
     );
     return false;
   }
+}
+
+/* ── Tiny HTML escape (avoid pulling a whole helper lib for one use) ── */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
