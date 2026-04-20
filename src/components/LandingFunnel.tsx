@@ -631,16 +631,6 @@ export function LandingFunnel() {
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
-
-              <div className="mt-5 rounded-input bg-brand-tealLight p-3.5 text-center text-[13px] text-brand-tealDark">
-                Hello Hosty user?{" "}
-                <a
-                  href="/members/review"
-                  className="font-semibold text-brand-tealDark no-underline"
-                >
-                  Use your login email for 30% off
-                </a>
-              </div>
             </div>
           </div>
         </section>
