@@ -14,7 +14,7 @@ import Link from "next/link";
  *   Step 1 → Step 2 → Step 3 (numbered cards with visual mockups)
  *   What's in your report (6-tile benefits grid)
  *   Why it works (3-column explainer of the AI analysis)
- *   Testimonial (Ahmad)
+ *   Testimonial (Alex)
  *   FAQ
  *   Final CTA
  */
@@ -553,7 +553,7 @@ export default function HowItWorksPage() {
               A
             </div>
             <div className="text-left">
-              <div className="font-semibold text-brand-dark">Ahmad</div>
+              <div className="font-semibold text-brand-dark">Alex</div>
               <div className="text-brand-grey400">Airbnb host · Hello Hosty customer</div>
             </div>
           </div>
