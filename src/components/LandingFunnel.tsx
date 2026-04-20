@@ -527,7 +527,7 @@ export function LandingFunnel() {
               <span>100% free&nbsp;&mdash; no card required</span>
               <span>&middot;</span>
               <a
-                href="#"
+                href="/sample"
                 className="font-medium text-brand-teal hover:text-brand-tealDark"
               >
                 See a sample report
