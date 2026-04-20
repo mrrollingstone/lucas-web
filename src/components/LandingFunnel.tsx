@@ -92,12 +92,19 @@ export function LandingFunnel() {
     const params = new URLSearchParams(window.location.search);
     const qEmail = params.get("email");
     const qSource = params.get("utm_source");
+    const qUrl = params.get("url");
     if (qEmail && qEmail.includes("@") && qEmail.includes(".")) {
       setEmailValue(qEmail);
       setSession((s) => ({ ...s, email: qEmail }));
       setEmailPrefilled(true);
     }
     if (qSource === "summit") setIsSummitLead(true);
+    // Handoff from hellohosty.com homepage block — pre-fill step 1 with the
+    // URL the visitor pasted there. Same airbnb/abnb validation as submitUrl.
+    if (qUrl && (qUrl.includes("airbnb") || qUrl.includes("abnb"))) {
+      setUrlValue(qUrl);
+      setSession((s) => ({ ...s, listing_url: qUrl }));
+    }
   }, []);
 
   /* Step 3 — generation animation */
