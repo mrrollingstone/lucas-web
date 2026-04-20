@@ -308,11 +308,15 @@ export function LandingFunnel() {
               Powered by AI
             </div>
 
-            {/* Title */}
-            <h1 className="mb-5 font-serif text-[clamp(36px,5vw,54px)] font-bold leading-[1.15] tracking-tight text-brand-dark max-sm:text-[32px]">
-              Your free listing
+            {/* Title — placard-style, each phrase on a cream highlight block */}
+            <h1 className="mb-5 font-display text-[clamp(40px,5.4vw,62px)] font-normal leading-[1.25] tracking-tight text-brand-dark max-sm:text-[36px]">
+              <span className="hero-highlight">Your free</span>
               <br />
-              <span className="text-brand-teal">game plan</span>
+              <span className="hero-highlight text-brand-teal">listing</span>
+              <br />
+              <span className="hero-highlight italic text-brand-red">
+                game plan.
+              </span>
             </h1>
 
             {/* Subtitle */}

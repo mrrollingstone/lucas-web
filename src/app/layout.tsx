@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, Fraunces } from "next/font/google";
+import { DM_Sans, Fraunces, Archivo_Black } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 
@@ -12,6 +12,13 @@ const dmSans = DM_Sans({
 const fraunces = Fraunces({
   subsets: ["latin"],
   variable: "--font-fraunces",
+  display: "swap",
+});
+
+const archivoBlack = Archivo_Black({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-archivo-black",
   display: "swap",
 });
 
@@ -35,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en-GB" className={`${dmSans.variable} ${fraunces.variable}`}>
+    <html lang="en-GB" className={`${dmSans.variable} ${fraunces.variable} ${archivoBlack.variable}`}>
       <head>
         {PIXEL_ID && (
           <>

@@ -7,6 +7,13 @@ export default {
       fontFamily: {
         sans: ["var(--font-dm-sans)", "DM Sans", "sans-serif"],
         serif: ["var(--font-fraunces)", "Fraunces", "serif"],
+        display: [
+          "var(--font-archivo-black)",
+          "Archivo Black",
+          "Helvetica Neue",
+          "Arial Black",
+          "sans-serif",
+        ],
       },
       colors: {
         brand: {
@@ -20,6 +27,7 @@ export default {
           dark: "#1a1a2e",
           darkMid: "#2d2d44",
           mist: "#F2F2F2",
+          cream: "#F7F1E3",
           grey600: "#555",
           grey400: "#999",
           grey200: "#e0e0e0",

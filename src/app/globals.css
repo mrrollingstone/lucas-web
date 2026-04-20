@@ -32,3 +32,12 @@ body {
 .scan-line:nth-child(2)::after { animation-delay: 0.3s; }
 .scan-line:nth-child(3)::after { animation-delay: 0.6s; }
 .scan-line:nth-child(4)::after { animation-delay: 0.9s; }
+
+/* ── Placard-style highlighted word blocks (each phrase on its own cream bg) ── */
+.hero-highlight {
+  background-color: #F7F1E3;
+  padding: 0.05em 0.28em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  line-height: 1.15;
+}
