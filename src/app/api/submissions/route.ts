@@ -40,19 +40,25 @@ const BRAND_INK = "#1F2933";
 /* ── Payload shape from the frontend ── */
 interface SubmissionPayload {
   email: string;
-  host_name: string;
-  property_name: string;
+  // Most fields are optional so the summit-campaign path (which only carries
+  // email + listing_url + platform) can reuse this endpoint without bloating
+  // the payload with `undefined`s.
+  host_name?: string;
+  property_name?: string;
   listing_url: string;
   platform: string;
-  superhost: boolean;
-  reviews_count: number;
-  avg_rating: number;
+  superhost?: boolean;
+  reviews_count?: number;
+  avg_rating?: number;
   booking_url?: string;
   vrbo_url?: string;
   website_url?: string;
   is_first_time: boolean;
   submitted_at: string;
-  scraped_at: string | null;
+  scraped_at?: string | null;
+  // Set to "summit" when the visitor arrived from the Short Stay Summit
+  // Meta Instant Form (see the bridge email in Mailchimp).
+  utm_source?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -87,11 +93,12 @@ export async function POST(req: NextRequest) {
   /* ── 3. Forward to n8n — kicks off the report-generation pipeline ── */
   const n8nOk = await forwardToN8n({ ...body, ip });
 
-  /* ── 4. Tag in Mailchimp with `lucas-first-review` for the 24h+ drip ── */
-  const mcOk = await tagInMailchimp(body.email, body.host_name);
+  /* ── 4. Tag in Mailchimp — dual-tag summit-campaign leads ── */
+  const isSummit = body.utm_source === "summit";
+  const mcOk = await tagInMailchimp(body.email, body.host_name || "", isSummit);
 
   console.log(
-    `📋 Submission: email=${body.email} listing=${body.listing_url} title="${propertyTitle}" welcome=${welcomeOk ? "ok" : "fail"} n8n=${n8nOk ? "ok" : "fail"} mc=${mcOk ? "ok" : "fail"}`,
+    `📋 Submission: email=${body.email} listing=${body.listing_url} title="${propertyTitle}" welcome=${welcomeOk ? "ok" : "fail"} n8n=${n8nOk ? "ok" : "fail"} mc=${mcOk ? "ok" : "fail"}${isSummit ? " [summit]" : ""}`,
   );
 
   return NextResponse.json({
@@ -238,10 +245,13 @@ async function forwardToN8n(
   }
 }
 
-/* ── Mailchimp: upsert contact + apply tag (drives the 24h+ drip) ── */
+/* ── Mailchimp: upsert contact + apply tag(s).
+ *    Summit-campaign leads get both `lucas-first-review` and `summit-2026` so
+ *    they land in the correct downstream drip path. ── */
 async function tagInMailchimp(
   email: string,
   firstName: string,
+  isSummit: boolean = false,
 ): Promise<boolean> {
   if (!MC_API_KEY || !MC_LIST_ID) {
     console.warn("Mailchimp not configured — skipping tag");
@@ -262,8 +272,15 @@ async function tagInMailchimp(
       },
     });
 
+    const tags: Array<{ name: string; status: "active" | "inactive" }> = [
+      { name: "lucas-first-review", status: "active" },
+    ];
+    if (isSummit) {
+      tags.push({ name: "summit-2026", status: "active" });
+    }
+
     await mailchimp.lists.updateListMemberTags(MC_LIST_ID, subscriberHash, {
-      tags: [{ name: "lucas-first-review", status: "active" as const }],
+      tags,
     });
 
     return true;
