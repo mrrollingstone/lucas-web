@@ -457,7 +457,7 @@ export function LandingFunnel() {
             <StepsBar current={1} />
 
             {/* Title — continues the ad's thought: provocation → resolution */}
-            <h1 className="mb-7 font-display text-[clamp(44px,6.4vw,78px)] font-normal leading-[1.12] tracking-tight text-brand-dark max-sm:text-[40px]">
+            <h1 className="mb-7 font-display text-[clamp(34px,4.8vw,60px)] font-normal leading-[1.15] tracking-tight text-brand-dark max-sm:text-[32px]">
               <span className="hero-highlight">Creating a listing</span>
               <br />
               <span className="hero-highlight">is one thing.</span>
