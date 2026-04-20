@@ -113,6 +113,22 @@ export function LandingFunnel() {
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
+  /* Top-nav "Get started" URL modal */
+  const [showUrlModal, setShowUrlModal] = useState(false);
+  useEffect(() => {
+    if (!showUrlModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowUrlModal(false);
+    };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showUrlModal]);
+
   /* ─── Navigation ─── */
   const goToStep = useCallback(
     (n: 1 | 2 | 3) => {
@@ -130,6 +146,7 @@ export function LandingFunnel() {
       return;
     }
     setUrlError(false);
+    setShowUrlModal(false);
     setSession((s) => ({ ...s, listing_url: url }));
 
     // Email already supplied via ?email= (summit-campaign landing): skip Step 2
@@ -255,25 +272,103 @@ export function LandingFunnel() {
         </a>
         <div className="hidden items-center gap-8 sm:flex">
           <a
-            href="#"
+            href="/how-it-works"
             className="text-sm font-medium text-brand-grey600 transition-colors hover:text-brand-dark"
           >
             How it works
           </a>
           <a
-            href="#"
+            href="/sample"
             className="text-sm font-medium text-brand-grey600 transition-colors hover:text-brand-dark"
           >
             Sample report
           </a>
-          <a
-            href="#"
+          <button
+            onClick={() => setShowUrlModal(true)}
             className="rounded-lg bg-brand-teal px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-tealDark"
           >
             Get started
-          </a>
+          </button>
         </div>
       </nav>
+
+      {/* ── "Get started" URL modal ── */}
+      {showUrlModal && (
+        <div
+          className="animate-fade-up fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm"
+          onClick={() => setShowUrlModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="url-modal-title"
+        >
+          <div
+            className="relative w-full max-w-[520px] rounded-card bg-white p-8 shadow-cardLg max-sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowUrlModal(false)}
+              aria-label="Close"
+              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-brand-grey400 transition-colors hover:bg-brand-grey200 hover:text-brand-dark"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+
+            <h2
+              id="url-modal-title"
+              className="mb-2 text-center font-serif text-[26px] font-semibold text-brand-dark max-sm:text-[22px]"
+            >
+              Paste your Airbnb URL here
+            </h2>
+            <p className="mb-6 text-center text-sm leading-relaxed text-brand-grey600">
+              We&apos;ll review your listing with AI and email you a free
+              professional report.
+            </p>
+
+            <input
+              type="text"
+              value={urlValue}
+              onChange={(e) => {
+                setUrlValue(e.target.value);
+                if (urlError) setUrlError(false);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && submitUrl()}
+              placeholder="https://airbnb.com/rooms/..."
+              autoFocus
+              className={`w-full rounded-[14px] border-2 bg-white px-4 py-3.5 font-sans text-base outline-none transition-all focus:border-brand-teal focus:shadow-[0_0_0_4px_rgba(43,181,178,.12)] ${
+                urlError ? "border-brand-red" : "border-brand-grey200"
+              }`}
+            />
+            {urlError && (
+              <p className="mt-2 text-[13px] text-brand-red">
+                Please enter a valid Airbnb listing URL
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={submitUrl}
+              className="mt-5 w-full rounded-xl bg-brand-red px-6 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.98]"
+            >
+              Try for free now
+            </button>
+
+            <p className="mt-4 text-center text-[13px] text-brand-grey400">
+              100% free&nbsp;&mdash; no card required
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Floating key video ── */}
       <div className="pointer-events-none fixed -bottom-5 -right-5 z-50 h-[200px] w-[200px] opacity-30 drop-shadow-[0_8px_32px_rgba(0,0,0,.15)] sm:h-[200px] sm:w-[200px] max-sm:h-[120px] max-sm:w-[120px]">
@@ -361,32 +456,25 @@ export function LandingFunnel() {
           <div className="relative mx-auto max-w-[720px] text-center">
             <StepsBar current={1} />
 
-            {/* Title — mirrors the ad placard verbatim */}
+            {/* Title — continues the ad's thought: provocation → resolution */}
             <h1 className="mb-7 font-display text-[clamp(44px,6.4vw,78px)] font-normal leading-[1.12] tracking-tight text-brand-dark max-sm:text-[40px]">
-              <span className="hero-highlight">Don&apos;t blame</span>
+              <span className="hero-highlight">Creating a listing</span>
+              <br />
+              <span className="hero-highlight">is one thing.</span>
+              <br />
+              <span className="hero-highlight">Optimising it</span>
               <br />
               <span className="hero-highlight text-brand-tealDark">
-                Airbnb.
+                for success
               </span>
               <br />
-              <span className="hero-highlight">Your listing</span>
-              <br />
-              <span className="hero-highlight">just isn&apos;t</span>
-              <br />
               <span className="hero-highlight italic text-brand-red">
-                that good.
+                is another.
               </span>
             </h1>
 
-            {/* Sub-placard — echoes ad's 'Optimise your listings, using AI.' */}
-            <p className="mb-4 font-display text-[clamp(16px,1.9vw,22px)] font-normal leading-[1.5] tracking-tight text-brand-dark">
-              <span className="hero-highlight">Optimise your listing,</span>
-              <br className="max-sm:hidden" />
-              <span className="hero-highlight max-sm:ml-1">using AI.</span>
-            </p>
-
             {/* Subtitle — offer detail in soft prose */}
-            <p className="mx-auto mb-10 max-w-[520px] text-[15px] leading-relaxed text-brand-grey600">
+            <p className="mx-auto mb-10 max-w-[540px] text-[15px] leading-relaxed text-brand-grey600">
               Get your free AI listing game plan&nbsp;&mdash; scores, quick
               wins, and ready-to-paste copy, in seconds.
             </p>
