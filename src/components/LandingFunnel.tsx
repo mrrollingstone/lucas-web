@@ -290,40 +290,85 @@ export function LandingFunnel() {
 
       {/* ════════════════════ STEP 1: HERO ════════════════════ */}
       {step === 1 && (
-        <section className="animate-fade-up min-h-screen px-6 pb-20 pt-[120px]">
-          <div className="mx-auto max-w-[680px] text-center">
+        <section className="animate-fade-up relative min-h-screen overflow-hidden px-6 pb-20 pt-[120px]">
+          {/* ── Background blobs — soft echo of the ad creative ── */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+          >
+            <svg
+              className="absolute -left-[12%] -top-[8%] h-[620px] w-[620px] opacity-[0.35] max-sm:h-[360px] max-sm:w-[360px]"
+              viewBox="0 0 600 600"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill="#f84455"
+                d="M420,90c55,55,95,130,90,205c-5,75-55,150-120,185c-65,35-145,30-210,-5c-65,-35,-115,-100,-125,-170c-10,-70,20,-145,70,-200c50,-55,120,-90,195,-95c75,-5,140,25,195,80Z"
+              />
+            </svg>
+            <svg
+              className="absolute -right-[10%] top-[18%] h-[560px] w-[560px] opacity-[0.38] max-sm:h-[320px] max-sm:w-[320px]"
+              viewBox="0 0 600 600"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill="#2BB5B2"
+                d="M470,160c45,70,45,165,5,240c-40,75,-120,130,-205,135c-85,5,-175,-40,-215,-115c-40,-75,-30,-180,25,-245c55,-65,155,-90,240,-75c85,15,155,90,150,60Z"
+              />
+            </svg>
+            <svg
+              className="absolute -bottom-[18%] left-[8%] h-[520px] w-[520px] opacity-[0.30] max-sm:h-[300px] max-sm:w-[300px]"
+              viewBox="0 0 600 600"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill="#2BB5B2"
+                d="M380,110c60,45,95,125,95,200c0,75,-35,145,-90,190c-55,45,-135,55,-210,35c-75,-20,-145,-75,-165,-150c-20,-75,10,-170,70,-225c60,-55,150,-75,220,-60c70,15,120,65,80,10Z"
+              />
+            </svg>
+            <svg
+              className="absolute -bottom-[10%] -right-[8%] h-[460px] w-[460px] opacity-[0.28] max-sm:hidden"
+              viewBox="0 0 600 600"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill="#f84455"
+                d="M450,140c40,65,35,160,-5,225c-40,65,-115,105,-195,110c-80,5,-165,-25,-210,-85c-45,-60,-50,-150,-10,-215c40,-65,125,-105,210,-105c85,0,170,40,210,70Z"
+              />
+            </svg>
+          </div>
+
+          <div className="relative mx-auto max-w-[720px] text-center">
             <StepsBar current={1} />
 
-            {/* Badge */}
-            <div className="mb-7 inline-flex items-center gap-2 rounded-full bg-brand-tealLight px-4 py-2 text-[13px] font-semibold tracking-wide text-brand-tealDark">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                className="h-3.5 w-3.5"
-              >
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-              </svg>
-              Powered by AI
-            </div>
-
-            {/* Title — placard-style, each phrase on a cream highlight block */}
-            <h1 className="mb-5 font-display text-[clamp(40px,5.4vw,62px)] font-normal leading-[1.25] tracking-tight text-brand-dark max-sm:text-[36px]">
-              <span className="hero-highlight">Your free</span>
+            {/* Title — mirrors the ad placard verbatim */}
+            <h1 className="mb-7 font-display text-[clamp(44px,6.4vw,78px)] font-normal leading-[1.12] tracking-tight text-brand-dark max-sm:text-[40px]">
+              <span className="hero-highlight">Don&apos;t blame</span>
               <br />
-              <span className="hero-highlight text-brand-teal">listing</span>
+              <span className="hero-highlight text-brand-tealDark">
+                Airbnb.
+              </span>
+              <br />
+              <span className="hero-highlight">Your listing</span>
+              <br />
+              <span className="hero-highlight">just isn&apos;t</span>
               <br />
               <span className="hero-highlight italic text-brand-red">
-                game plan.
+                that good.
               </span>
             </h1>
 
-            {/* Subtitle */}
-            <p className="mx-auto mb-10 max-w-[520px] text-lg leading-relaxed text-brand-grey600">
-              Hello Hosty reviews your Airbnb listing and delivers a free
-              professional report with scores, quick wins, and ready-to-paste
-              optimised copy&nbsp;&mdash; in seconds.
+            {/* Sub-placard — echoes ad's 'Optimise your listings, using AI.' */}
+            <p className="mb-4 font-display text-[clamp(16px,1.9vw,22px)] font-normal leading-[1.5] tracking-tight text-brand-dark">
+              <span className="hero-highlight">Optimise your listing,</span>
+              <br className="max-sm:hidden" />
+              <span className="hero-highlight max-sm:ml-1">using AI.</span>
+            </p>
+
+            {/* Subtitle — offer detail in soft prose */}
+            <p className="mx-auto mb-10 max-w-[520px] text-[15px] leading-relaxed text-brand-grey600">
+              Get your free AI listing game plan&nbsp;&mdash; scores, quick
+              wins, and ready-to-paste copy, in seconds.
             </p>
 
             {/* URL input */}
@@ -355,9 +400,10 @@ export function LandingFunnel() {
               />
               <button
                 onClick={submitUrl}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-input bg-brand-red px-6 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.97] max-sm:relative max-sm:right-auto max-sm:top-auto max-sm:mt-3 max-sm:w-full max-sm:translate-y-0 max-sm:rounded-xl max-sm:py-4"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-input bg-brand-red px-6 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.97] max-sm:relative max-sm:right-auto max-sm:top-auto max-sm:mt-3 max-sm:w-full max-sm:translate-y-0 max-sm:justify-center max-sm:rounded-xl max-sm:py-4"
               >
-                Get free review
+                Try for free now
+                <span aria-hidden>&rarr;</span>
               </button>
             </div>
 
