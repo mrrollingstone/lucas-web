@@ -296,64 +296,64 @@ export function LandingFunnel() {
             aria-hidden
             className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
           >
-            {/* Top-left red gloop — lumpy & lopsided */}
+            {/* Top-left red — kidney with a bulge pointing inward */}
             <svg
-              className="absolute -left-[14%] -top-[10%] h-[640px] w-[640px] opacity-[0.42] max-sm:h-[360px] max-sm:w-[360px]"
-              viewBox="0 0 600 600"
-              xmlns="http://www.w3.org/2000/svg"
-              style={{ transform: "rotate(-12deg)" }}
-            >
-              <path
-                fill="#f84455"
-                d="M132,56 C232,18 364,40 444,116 C528,182 576,280 552,386 C530,486 420,556 312,548 C220,572 104,520 58,430 C6,336 18,210 76,130 C98,96 112,76 132,56 Z"
-              />
-            </svg>
-            {/* Top-right teal gloop — kidney-bean, pinched waist */}
-            <svg
-              className="absolute -right-[12%] top-[14%] h-[580px] w-[580px] opacity-[0.48] max-sm:h-[320px] max-sm:w-[320px]"
-              viewBox="0 0 600 600"
-              xmlns="http://www.w3.org/2000/svg"
-              style={{ transform: "rotate(22deg)" }}
-            >
-              <path
-                fill="#2BB5B2"
-                d="M248,44 C378,24 488,92 548,200 C592,282 568,394 484,448 C432,482 408,512 344,524 C238,548 122,502 62,416 C2,328 18,208 92,130 C140,82 172,60 228,48 C236,46 244,44 248,44 Z"
-              />
-            </svg>
-            {/* Bottom-left teal gloop — wavy top, flat-ish bottom */}
-            <svg
-              className="absolute -bottom-[22%] -left-[6%] h-[540px] w-[540px] opacity-[0.38] max-sm:h-[300px] max-sm:w-[300px]"
-              viewBox="0 0 600 600"
-              xmlns="http://www.w3.org/2000/svg"
-              style={{ transform: "rotate(-28deg)" }}
-            >
-              <path
-                fill="#2BB5B2"
-                d="M60,220 C98,130 210,72 328,88 C456,104 552,206 540,332 C528,448 402,522 286,520 C186,534 82,478 40,388 C-4,298 16,218 46,200 C54,196 54,214 60,220 Z"
-              />
-            </svg>
-            {/* Bottom-right red gloop — big uneven drop */}
-            <svg
-              className="absolute -bottom-[14%] -right-[10%] h-[500px] w-[500px] opacity-[0.38] max-sm:hidden"
+              className="absolute -left-[8%] -top-[14%] h-[680px] w-[680px] opacity-[0.45] max-sm:h-[380px] max-sm:w-[380px]"
               viewBox="0 0 600 600"
               xmlns="http://www.w3.org/2000/svg"
               style={{ transform: "rotate(18deg)" }}
             >
               <path
                 fill="#f84455"
-                d="M172,62 C276,30 396,92 448,184 C518,288 500,410 410,480 C320,550 188,548 112,478 C22,396 -8,276 50,184 C92,118 142,82 172,62 Z"
+                d="M100,170 C60,80 180,20 300,40 C440,60 560,160 540,300 C530,360 460,320 420,360 C400,400 460,440 420,500 C370,560 250,560 170,510 C60,440 20,340 60,260 C80,220 130,250 100,170 Z"
               />
             </svg>
-            {/* Accent teal squiggle — mid-right, small */}
+            {/* Top-right teal — wavy tongue with two bumps along the bottom */}
             <svg
-              className="absolute right-[-4%] top-[48%] h-[240px] w-[240px] opacity-[0.35] max-sm:hidden"
+              className="absolute -right-[10%] top-[8%] h-[620px] w-[620px] opacity-[0.52] max-sm:h-[340px] max-sm:w-[340px]"
               viewBox="0 0 600 600"
               xmlns="http://www.w3.org/2000/svg"
-              style={{ transform: "rotate(-40deg)" }}
+              style={{ transform: "rotate(-18deg)" }}
             >
               <path
                 fill="#2BB5B2"
-                d="M180,80 C300,60 420,130 450,240 C480,360 380,460 260,460 C140,460 50,360 70,240 C90,150 130,100 180,80 Z"
+                d="M260,40 C400,20 530,100 550,220 C570,320 490,360 490,420 C490,470 420,510 330,500 C260,530 200,460 180,420 C150,390 60,420 40,330 C20,230 90,160 160,130 C210,110 170,60 260,40 Z"
+              />
+            </svg>
+            {/* Bottom-left teal — lopsided drop with a pointy top-right */}
+            <svg
+              className="absolute -bottom-[16%] -left-[4%] h-[560px] w-[560px] opacity-[0.42] max-sm:h-[300px] max-sm:w-[300px]"
+              viewBox="0 0 600 600"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{ transform: "rotate(32deg)" }}
+            >
+              <path
+                fill="#2BB5B2"
+                d="M80,240 C50,140 170,60 290,70 C380,60 430,160 480,180 C550,210 540,320 490,390 C430,480 310,520 210,490 C110,470 30,400 40,320 C40,290 100,310 80,240 Z"
+              />
+            </svg>
+            {/* Bottom-right red — banana / comma shape */}
+            <svg
+              className="absolute -bottom-[10%] -right-[6%] h-[520px] w-[520px] opacity-[0.42] max-sm:hidden"
+              viewBox="0 0 600 600"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{ transform: "rotate(-22deg)" }}
+            >
+              <path
+                fill="#f84455"
+                d="M140,60 C260,20 410,90 470,210 C510,310 440,360 420,420 C380,500 250,520 160,470 C60,410 20,320 50,230 C70,170 110,140 140,60 Z"
+              />
+            </svg>
+            {/* Mid-left accent teal — small curly squiggle */}
+            <svg
+              className="absolute left-[-3%] top-[38%] h-[220px] w-[220px] opacity-[0.40] max-sm:hidden"
+              viewBox="0 0 600 600"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{ transform: "rotate(45deg)" }}
+            >
+              <path
+                fill="#2BB5B2"
+                d="M180,60 C280,30 400,90 430,190 C460,290 400,400 300,430 C200,460 100,390 90,300 C80,210 120,130 180,60 Z"
               />
             </svg>
           </div>
