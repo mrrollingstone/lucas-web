@@ -11,6 +11,32 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 
+/* ─── Paywall redirect helper ─── *
+ * If /api/submissions returns 402 (repeat review — email has already had its
+ * free one), bounce to the paywall page with email+url+hh query params so it
+ * can render the right pricing card without re-hitting the API immediately.
+ * Returns true if we handled the response by redirecting. */
+async function maybeRedirectToPaywall(res: Response, email: string, url: string): Promise<boolean> {
+  if (res.status !== 402) return false;
+  let data: { needs_payment?: boolean; is_hh_member?: boolean; checkout_url?: string } = {};
+  try {
+    data = await res.json();
+  } catch {
+    /* non-JSON 402 — still treat as paywall */
+  }
+  if (!data.needs_payment) return false;
+  const qs = new URLSearchParams({
+    email,
+    url,
+    hh: String(Boolean(data.is_hh_member)),
+  });
+  // If the API already minted a checkout URL, we could go straight there, but
+  // routing through /paywall gives the user the option to upgrade to HH
+  // membership instead of paying the one-off price.
+  window.location.href = `/paywall?${qs.toString()}`;
+  return true;
+}
+
 /* ─── Types ─── */
 interface SessionData {
   listing_url: string;
@@ -82,6 +108,10 @@ export function LandingFunnel() {
   /* Step 2 */
   const [emailValue, setEmailValue] = useState("");
   const [emailError, setEmailError] = useState(false);
+  // "Checking your account…" loader while we wait on /api/submissions. This
+  // is usually ~500ms — just long enough to cover the Stripe member lookup on
+  // repeat submissions.
+  const [emailSubmitting, setEmailSubmitting] = useState(false);
 
   /* Summit-campaign arrivals (?email=…&utm_source=summit) */
   const [isSummitLead, setIsSummitLead] = useState(false);
@@ -169,19 +199,28 @@ export function LandingFunnel() {
         ...(isSummitLead ? { utm_source: "summit" } : {}),
       };
       setSession((s) => ({ ...s, email: emailValue, submitted_at: now }));
-      fetch("/api/submissions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }).catch(() => {});
-      // Summit users already Lead'd on Meta's Instant Form — fire
-      // CompleteRegistration to avoid double-counting the Lead event.
-      if (isSummitLead) {
-        fbqTrack("CompleteRegistration", { content_name: "lucas-summit-url-submit" });
-      } else {
-        fbqTrack("Lead", { content_name: "lucas-free-review" });
-      }
-      goToStep(3);
+      // Branch on 402 (repeat review → paywall). Await the response so the
+      // redirect happens before the generation animation starts.
+      (async () => {
+        let redirected = false;
+        try {
+          const res = await fetch("/api/submissions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          redirected = await maybeRedirectToPaywall(res, emailValue, url);
+        } catch {
+          /* network blip — continue to step 3, user will still get the email */
+        }
+        if (redirected) return;
+        if (isSummitLead) {
+          fbqTrack("CompleteRegistration", { content_name: "lucas-summit-url-submit" });
+        } else {
+          fbqTrack("Lead", { content_name: "lucas-free-review" });
+        }
+        goToStep(3);
+      })();
       return;
     }
 
@@ -208,12 +247,25 @@ export function LandingFunnel() {
 
     setSession((s) => ({ ...s, email, submitted_at: now }));
 
-    // Fire-and-forget save — this triggers the full pipeline server-side
-    fetch("/api/submissions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
+    // Branch on 402 (repeat review → paywall). Await the response so we don't
+    // flash the generation animation before redirecting.
+    setEmailSubmitting(true);
+    let redirected = false;
+    try {
+      const res = await fetch("/api/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      redirected = await maybeRedirectToPaywall(res, email, session.listing_url);
+    } catch {
+      /* swallow — step 3 still plays; pipeline failure will surface via email */
+    }
+    if (redirected) {
+      // Leave the loader up — the redirect is about to navigate away.
+      return;
+    }
+    setEmailSubmitting(false);
 
     // Meta Pixel: standard Lead event on email capture
     fbqTrack("Lead", { content_name: "lucas-free-review" });
@@ -619,19 +671,48 @@ export function LandingFunnel() {
 
               <button
                 onClick={submitEmail}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-red px-10 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.98]"
+                disabled={emailSubmitting}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-red px-10 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.98] disabled:cursor-wait disabled:bg-brand-grey400 disabled:hover:bg-brand-grey400"
               >
-                Get my free report
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
+                {emailSubmitting ? (
+                  <>
+                    <svg
+                      className="h-4 w-4 animate-spin"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeOpacity="0.3"
+                        strokeWidth="3"
+                      />
+                      <path
+                        d="M12 2a10 10 0 0 1 10 10"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    Checking your account…
+                  </>
+                ) : (
+                  <>
+                    Get my free report
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                    >
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </>
+                )}
               </button>
             </div>
           </div>

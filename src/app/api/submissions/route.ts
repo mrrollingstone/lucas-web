@@ -2,22 +2,41 @@
  * POST /api/submissions
  *
  * Accepts the full session payload from the landing funnel after step 3.
+ *
+ * Step 0 (new): repeat-review gate.
+ *    Before any compute, look the email up in `lucas_submissions`. If the
+ *    caller has already had their free review we short-circuit with 402 and a
+ *    Stripe Checkout URL instead of kicking off another scrape + analysis.
+ *
+ * Then, for first-time callers:
  * 1. Scrapes the Airbnb listing title (so the welcome email reads naturally)
  * 2. Sends an immediate "Hey there, thanks for trying Lucas" email via Resend
  *    using the scraped property title — replaces the previous n8n lucas-drip
  *    webhook which sent the same email but with the raw URL embedded.
  * 3. Forwards to n8n webhook (which kicks off the report-generation pipeline)
  * 4. Tags the email in Mailchimp with `lucas-first-review` (drives the 24h+ drip)
+ * 5. Increments `reviews_delivered` on the submissions row. We count on n8n
+ *    accept rather than a downstream delivery callback — pragmatic given we
+ *    don't currently get a "PDF sent" signal back from n8n.
  *
  * Env vars required:
  *   RESEND_API_KEY         — for the welcome email
  *   N8N_BASE_URL, N8N_WEBHOOK_TOKEN
  *   MAILCHIMP_API_KEY, MAILCHIMP_LIST_ID
+ *   DATABASE_URL           — Vercel Postgres (for the repeat-review gate)
+ *   STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_MEMBER_COUPON (optional)
  */
 import { NextRequest, NextResponse } from "next/server";
 import mailchimp from "@mailchimp/mailchimp_marketing";
 import { Resend } from "resend";
 import crypto from "crypto";
+import {
+  getSubmission,
+  upsertFreeSubmission,
+  incrementDelivered,
+} from "@/lib/db";
+import { lookupHhMember } from "@/lib/hh-member";
+import { createPaywallCheckout } from "@/lib/stripe-checkout";
 
 /* ── Env ── */
 const N8N_URL = process.env.N8N_BASE_URL;
@@ -81,6 +100,38 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-real-ip") ||
     "unknown";
 
+  /* ── 0. Repeat-review gate — MUST run before any compute/cost ──
+   *    If this email has already been delivered a review, we refuse to
+   *    generate another free one. Instead we mint a Stripe Checkout URL and
+   *    hand it back with 402 Payment Required so the frontend can redirect.
+   */
+  const existing = await getSubmission(body.email);
+  if (existing && existing.reviews_delivered >= 1) {
+    // Member lookup (cached on the row for 7 days).
+    const isHhMember = await lookupHhMember(body.email);
+    const checkoutUrl = await createPaywallCheckout({
+      email: body.email,
+      airbnbUrl: body.listing_url,
+      isHhMember,
+    });
+    console.log(
+      `💳 Repeat review — paywall: email=${body.email} hh_member=${isHhMember} delivered=${existing.reviews_delivered}`,
+    );
+    return NextResponse.json(
+      {
+        needs_payment: true,
+        is_hh_member: isHhMember,
+        email: body.email,
+        checkout_url: checkoutUrl,
+      },
+      { status: 402 },
+    );
+  }
+
+  /* ── 0b. First-time caller — record the row now so lookupHhMember can
+   *       cache against it. Idempotent; safe to call repeatedly. */
+  await upsertFreeSubmission(body.email);
+
   /* ── 1. Scrape the listing title (best-effort, ~10s budget) ── */
   const propertyTitle =
     body.property_name?.trim() ||
@@ -96,6 +147,13 @@ export async function POST(req: NextRequest) {
   /* ── 4. Tag in Mailchimp — dual-tag summit-campaign leads ── */
   const isSummit = body.utm_source === "summit";
   const mcOk = await tagInMailchimp(body.email, body.host_name || "", isSummit);
+
+  /* ── 5. Count the delivered review iff n8n accepted the job. We do NOT
+   *       bump the counter if n8n is unreachable — that's exactly the case
+   *       where the user hasn't actually had their free one. */
+  if (n8nOk) {
+    await incrementDelivered(body.email);
+  }
 
   console.log(
     `📋 Submission: email=${body.email} listing=${body.listing_url} title="${propertyTitle}" welcome=${welcomeOk ? "ok" : "fail"} n8n=${n8nOk ? "ok" : "fail"} mc=${mcOk ? "ok" : "fail"}${isSummit ? " [summit]" : ""}`,
