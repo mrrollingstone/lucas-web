@@ -400,10 +400,9 @@ export function LandingFunnel() {
           >
             {/* Top-left red — kidney with a bulge pointing inward */}
             <svg
-              className="absolute -left-[8%] -top-[14%] h-[680px] w-[680px] opacity-[0.45] max-sm:h-[380px] max-sm:w-[380px]"
+              className="blob blob-1 absolute -left-[8%] -top-[14%] h-[680px] w-[680px] opacity-[0.45] max-sm:h-[380px] max-sm:w-[380px]"
               viewBox="0 0 600 600"
               xmlns="http://www.w3.org/2000/svg"
-              style={{ transform: "rotate(18deg)" }}
             >
               <path
                 fill="#f84455"
@@ -412,10 +411,9 @@ export function LandingFunnel() {
             </svg>
             {/* Top-right teal — wavy tongue with two bumps along the bottom */}
             <svg
-              className="absolute -right-[10%] top-[8%] h-[620px] w-[620px] opacity-[0.52] max-sm:h-[340px] max-sm:w-[340px]"
+              className="blob blob-2 absolute -right-[10%] top-[8%] h-[620px] w-[620px] opacity-[0.52] max-sm:h-[340px] max-sm:w-[340px]"
               viewBox="0 0 600 600"
               xmlns="http://www.w3.org/2000/svg"
-              style={{ transform: "rotate(-18deg)" }}
             >
               <path
                 fill="#2BB5B2"
@@ -424,10 +422,9 @@ export function LandingFunnel() {
             </svg>
             {/* Bottom-left teal — lopsided drop with a pointy top-right */}
             <svg
-              className="absolute -bottom-[16%] -left-[4%] h-[560px] w-[560px] opacity-[0.42] max-sm:h-[300px] max-sm:w-[300px]"
+              className="blob blob-3 absolute -bottom-[16%] -left-[4%] h-[560px] w-[560px] opacity-[0.42] max-sm:h-[300px] max-sm:w-[300px]"
               viewBox="0 0 600 600"
               xmlns="http://www.w3.org/2000/svg"
-              style={{ transform: "rotate(32deg)" }}
             >
               <path
                 fill="#2BB5B2"
@@ -436,10 +433,9 @@ export function LandingFunnel() {
             </svg>
             {/* Bottom-right red — banana / comma shape */}
             <svg
-              className="absolute -bottom-[10%] -right-[6%] h-[520px] w-[520px] opacity-[0.42] max-sm:hidden"
+              className="blob blob-4 absolute -bottom-[10%] -right-[6%] h-[520px] w-[520px] opacity-[0.42] max-sm:hidden"
               viewBox="0 0 600 600"
               xmlns="http://www.w3.org/2000/svg"
-              style={{ transform: "rotate(-22deg)" }}
             >
               <path
                 fill="#f84455"
@@ -448,10 +444,9 @@ export function LandingFunnel() {
             </svg>
             {/* Mid-left accent teal — small curly squiggle */}
             <svg
-              className="absolute left-[-3%] top-[38%] h-[220px] w-[220px] opacity-[0.40] max-sm:hidden"
+              className="blob blob-5 absolute left-[-3%] top-[38%] h-[220px] w-[220px] opacity-[0.40] max-sm:hidden"
               viewBox="0 0 600 600"
               xmlns="http://www.w3.org/2000/svg"
-              style={{ transform: "rotate(45deg)" }}
             >
               <path
                 fill="#2BB5B2"

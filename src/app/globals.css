@@ -37,3 +37,57 @@ body {
 .hero-highlight {
   line-height: 1.15;
 }
+
+/* ── Lava-lamp blobs ──
+   Each blob has its own keyframe so durations/phases are unsynced. The
+   baseline rotation is baked into every frame (CSS animation wins over
+   inline transform, so we keep the look by declaring it here). Using
+   translate + scale(x,y) + skew gives the "changing shape" impression
+   without actually morphing the SVG path, which is cheap and buttery
+   smooth on the GPU. */
+.blob {
+  transform-origin: center;
+  transform-box: fill-box;
+  will-change: transform;
+}
+
+@keyframes blobDrift1 {
+  0%, 100% { transform: rotate(18deg) translate(0, 0) scale(1, 1) skew(0deg, 0deg); }
+  25%      { transform: rotate(34deg) translate(70px, -55px) scale(1.18, 0.82) skew(-12deg, 6deg); }
+  50%      { transform: rotate(6deg) translate(-50px, 75px) scale(0.84, 1.22) skew(10deg, -10deg); }
+  75%      { transform: rotate(28deg) translate(55px, 40px) scale(1.1, 0.94) skew(-7deg, 12deg); }
+}
+
+@keyframes blobDrift2 {
+  0%, 100% { transform: rotate(-18deg) translate(0, 0) scale(1, 1) skew(0deg, 0deg); }
+  33%      { transform: rotate(-4deg) translate(-65px, 55px) scale(1.17, 0.86) skew(10deg, -9deg); }
+  66%      { transform: rotate(-30deg) translate(48px, -70px) scale(0.86, 1.18) skew(-9deg, 8deg); }
+}
+
+@keyframes blobDrift3 {
+  0%, 100% { transform: rotate(32deg) translate(0, 0) scale(1, 1) skew(0deg, 0deg); }
+  30%      { transform: rotate(22deg) translate(60px, -48px) scale(1.22, 0.8) skew(-14deg, 7deg); }
+  60%      { transform: rotate(44deg) translate(-55px, 60px) scale(0.82, 1.25) skew(12deg, -8deg); }
+}
+
+@keyframes blobDrift4 {
+  0%, 100% { transform: rotate(-22deg) translate(0, 0) scale(1, 1) skew(0deg, 0deg); }
+  40%      { transform: rotate(-10deg) translate(-75px, -42px) scale(1.15, 1.04) skew(8deg, -13deg); }
+  70%      { transform: rotate(-34deg) translate(42px, 65px) scale(0.85, 1.14) skew(-10deg, 10deg); }
+}
+
+@keyframes blobDrift5 {
+  0%, 100% { transform: rotate(45deg) translate(0, 0) scale(1, 1) skew(0deg, 0deg); }
+  33%      { transform: rotate(70deg) translate(55px, -50px) scale(1.3, 0.78) skew(-16deg, 12deg); }
+  66%      { transform: rotate(20deg) translate(-45px, 55px) scale(0.8, 1.28) skew(14deg, -14deg); }
+}
+
+.blob-1 { animation: blobDrift1 18s ease-in-out infinite; }
+.blob-2 { animation: blobDrift2 22s ease-in-out infinite; animation-delay: -4s; }
+.blob-3 { animation: blobDrift3 20s ease-in-out infinite; animation-delay: -9s; }
+.blob-4 { animation: blobDrift4 25s ease-in-out infinite; animation-delay: -6s; }
+.blob-5 { animation: blobDrift5 14s ease-in-out infinite; animation-delay: -2s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .blob-1, .blob-2, .blob-3, .blob-4, .blob-5 { animation: none; }
+}
