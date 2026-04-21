@@ -171,7 +171,7 @@ function PaywallInner() {
   );
 }
 
-/* ─── Card: £25 one-off ─── */
+/* ─── Card: £19 one-off ─── */
 function OneOffCard({
   checkoutUrl,
   pending,
@@ -186,7 +186,7 @@ function OneOffCard({
       </div>
       <div className="mt-3 flex items-baseline gap-2">
         <span className="font-display text-[56px] leading-none text-brand-dark">
-          £25
+          £19
         </span>
         <span className="text-[14px] text-brand-grey600">one-off</span>
       </div>
@@ -207,7 +207,7 @@ function OneOffCard({
             href={checkoutUrl!}
             className="block w-full rounded-xl bg-brand-red px-6 py-4 text-center text-base font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.98]"
           >
-            Pay £25 and run it →
+            Pay £19 and run it →
           </a>
         )}
       </div>
@@ -229,12 +229,12 @@ function MemberUpsellCard() {
       </div>
       <div className="mt-3 flex items-baseline gap-2">
         <span className="font-display text-[56px] leading-none text-brand-dark">
-          £10
+          £9
         </span>
         <span className="text-[14px] text-brand-grey600">per review</span>
       </div>
       <p className="mt-4 max-w-[340px] text-[15px] leading-relaxed text-brand-grey600">
-        60% off every future review, plus unlimited access to the Hello Hosty
+        £10 off every future review, plus unlimited access to the Hello Hosty
         platform — everything else it does for your short-stay business.
       </p>
       <div className="mt-auto pt-6">
@@ -249,7 +249,7 @@ function MemberUpsellCard() {
   );
 }
 
-/* ─── Card: Single-card £10 (when the caller IS an HH member) ─── */
+/* ─── Card: Single-card £9 (when the caller IS an HH member) ─── */
 function MemberCard({
   checkoutUrl,
   pending,
@@ -263,17 +263,17 @@ function MemberCard({
         Welcome back, member
       </div>
       <h2 className="mt-2 font-serif text-[26px] font-semibold text-brand-dark">
-        Your price is £10.
+        Your price is £9.
       </h2>
       <p className="mt-3 text-[15px] leading-relaxed text-brand-grey600">
-        Your Hello Hosty membership gives you 60% off every review — the
+        Your Hello Hosty membership takes £10 off every review — the
         discount is already applied at checkout.
       </p>
       <div className="mt-6 flex items-baseline gap-2">
         <span className="font-display text-[56px] leading-none text-brand-dark">
-          £10
+          £9
         </span>
-        <span className="text-[14px] text-brand-grey600 line-through">£25</span>
+        <span className="text-[14px] text-brand-grey600 line-through">£19</span>
       </div>
       <div className="mt-6">
         {pending ? (
@@ -288,7 +288,7 @@ function MemberCard({
             href={checkoutUrl!}
             className="block w-full rounded-xl bg-brand-teal px-6 py-4 text-center text-base font-semibold text-white transition-colors hover:bg-brand-tealDark active:scale-[.98]"
           >
-            Pay £10 and run it →
+            Pay £9 and run it →
           </a>
         )}
       </div>

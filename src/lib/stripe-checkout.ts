@@ -1,9 +1,10 @@
 /**
  * Stripe Checkout session builder for the repeat-review paywall.
  *
- * Standard price    : STRIPE_PRICE_ID (£25 one-off)
- * Member discount   : STRIPE_MEMBER_COUPON (60% off → £10; apply only when
- *                     the submitter is a confirmed HH member)
+ * Standard price    : STRIPE_PRICE_ID (£19 one-off)
+ * Member discount   : STRIPE_MEMBER_COUPON (£10 off → £9; fixed-amount
+ *                     coupon, apply only when submitter is a confirmed
+ *                     HH member)
  *
  * client_reference_id carries the email so the webhook can resume the right
  * review, and `metadata.airbnb_url` is how we remember which listing to scrape
