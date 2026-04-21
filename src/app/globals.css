@@ -33,8 +33,16 @@ body {
 .scan-line:nth-child(3)::after { animation-delay: 0.6s; }
 .scan-line:nth-child(4)::after { animation-delay: 0.9s; }
 
-/* ── Hero statement lines — no background, sits naturally on the page ── */
+/* ── Hero statement lines — tight grey block behind each line so the text
+   sits cleanly over the blobs (mirrors the ad's plate-behind-text shape,
+   but uses the page background colour to read as a cutout, not an accent).
+   box-decoration-break: clone keeps the block shape on wrapped lines. */
 .hero-highlight {
+  background-color: #f2f2f2;
+  padding: 0.06em 0.34em;
+  border-radius: 6px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
   line-height: 1.15;
 }
 
