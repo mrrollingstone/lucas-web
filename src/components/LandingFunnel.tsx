@@ -60,22 +60,47 @@ function fbqTrack(event: string, params?: Record<string, unknown>) {
   if (typeof fbq === "function") fbq("track", event, params || {});
 }
 
-/* ─── Step-dot progress bar ─── */
-function StepsBar({ current }: { current: 1 | 2 | 3 }) {
+/* ─── Step-dot progress bar ─── *
+ * When `showLabels` is true, each dot carries a label underneath so the bar
+ * doubles as a 3-step explainer: Paste URL → Lucas reviews → Get your fixes.
+ * When false (used on steps 2 & 3 where the user is already in the flow),
+ * labels are omitted to save vertical space. */
+const STEP_LABELS = ["Paste URL", "Lucas reviews", "Get your fixes"] as const;
+
+function StepsBar({
+  current,
+  showLabels = false,
+}: {
+  current: 1 | 2 | 3;
+  showLabels?: boolean;
+}) {
   return (
     <div className="mb-10 flex items-center justify-center gap-2">
       {[1, 2, 3].map((n, i) => (
         <span key={n} className="flex items-center gap-2">
-          <span
-            className={`h-2.5 rounded-full transition-all duration-400 ${
-              n < current
-                ? "w-2.5 bg-brand-teal"
-                : n === current
-                  ? "w-8 rounded bg-brand-teal"
-                  : "w-2.5 bg-brand-grey200"
-            }`}
-          />
-          {i < 2 && <span className="h-0.5 w-6 bg-brand-grey200" />}
+          <span className="flex flex-col items-center gap-1.5">
+            <span
+              className={`h-2.5 rounded-full transition-all duration-400 ${
+                n < current
+                  ? "w-2.5 bg-brand-teal"
+                  : n === current
+                    ? "w-8 rounded bg-brand-teal"
+                    : "w-2.5 bg-brand-grey200"
+              }`}
+            />
+            {showLabels && (
+              <span
+                className={`whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors max-sm:text-[9px] ${
+                  n === current ? "text-brand-tealDark" : "text-brand-grey400"
+                }`}
+              >
+                {STEP_LABELS[n - 1]}
+              </span>
+            )}
+          </span>
+          {i < 2 && (
+            <span className={`h-0.5 w-6 bg-brand-grey200 ${showLabels ? "mb-5" : ""}`} />
+          )}
         </span>
       ))}
     </div>
@@ -104,6 +129,9 @@ export function LandingFunnel() {
   /* Step 1 */
   const [urlValue, setUrlValue] = useState("");
   const [urlError, setUrlError] = useState(false);
+  // Ref to the URL input so the "Get my free review" CTA below the fold can
+  // scroll + focus it cleanly.
+  const heroInputRef = useRef<HTMLInputElement | null>(null);
 
   /* Step 2 */
   const [emailValue, setEmailValue] = useState("");
@@ -174,6 +202,15 @@ export function LandingFunnel() {
     },
     [],
   );
+
+  /* Scroll the hero input into view and focus it — used by below-fold CTAs. */
+  const focusHeroInput = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Give the smooth-scroll a beat before focusing so we don't double-jump.
+    setTimeout(() => {
+      heroInputRef.current?.focus({ preventScroll: true });
+    }, 450);
+  }, []);
 
   /* ─── Step 1 → 2 (or straight to 3 for summit leads with pre-filled email) ─── */
   const submitUrl = useCallback(() => {
@@ -316,9 +353,10 @@ export function LandingFunnel() {
       >
         <a
           href="https://www.hellohosty.com"
-          className="flex items-center"
+          className="flex items-center gap-3"
           target="_blank"
           rel="noopener noreferrer"
+          aria-label="Lucas, by Hello Hosty"
         >
           <Image
             src="/Hello_Hosty_Logo.png"
@@ -328,6 +366,13 @@ export function LandingFunnel() {
             className="h-[30px] w-auto"
             priority
           />
+          <span
+            aria-hidden
+            className="h-5 w-px bg-brand-grey200"
+          />
+          <span className="font-serif text-[20px] font-semibold tracking-tight text-brand-tealDark max-sm:text-[17px]">
+            Lucas
+          </span>
         </a>
         <div className="hidden items-center gap-8 sm:flex">
           <a
@@ -442,178 +487,380 @@ export function LandingFunnel() {
         </video>
       </div>
 
-      {/* ════════════════════ STEP 1: HERO ════════════════════ */}
+      {/* ════════════════════ STEP 1: HERO + BELOW-FOLD ════════════════════ */}
       {step === 1 && (
-        <section className="animate-fade-up relative min-h-screen overflow-hidden px-6 pb-20 pt-[120px]">
-          {/* ── Background blobs — irregular, hand-drawn echo of the ad creative ── */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
-          >
-            {/* Top-left red — kidney with a bulge pointing inward */}
-            <svg
-              className="blob blob-1 absolute -left-[8%] -top-[14%] h-[680px] w-[680px] opacity-[0.45] max-sm:h-[380px] max-sm:w-[380px]"
-              viewBox="0 0 600 600"
-              xmlns="http://www.w3.org/2000/svg"
+        <>
+          <section className="animate-fade-up relative overflow-hidden px-6 pb-12 pt-[120px]">
+            {/* ── Background blobs — irregular, hand-drawn echo of the ad creative ── */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
             >
-              <path
-                fill="#f84455"
-                d="M100,170 C60,80 180,20 300,40 C440,60 560,160 540,300 C530,360 460,320 420,360 C400,400 460,440 420,500 C370,560 250,560 170,510 C60,440 20,340 60,260 C80,220 130,250 100,170 Z"
-              />
-            </svg>
-            {/* Top-right teal — wavy tongue with two bumps along the bottom */}
-            <svg
-              className="blob blob-2 absolute -right-[10%] top-[8%] h-[620px] w-[620px] opacity-[0.52] max-sm:h-[340px] max-sm:w-[340px]"
-              viewBox="0 0 600 600"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                fill="#2BB5B2"
-                d="M260,40 C400,20 530,100 550,220 C570,320 490,360 490,420 C490,470 420,510 330,500 C260,530 200,460 180,420 C150,390 60,420 40,330 C20,230 90,160 160,130 C210,110 170,60 260,40 Z"
-              />
-            </svg>
-            {/* Bottom-left teal — lopsided drop with a pointy top-right */}
-            <svg
-              className="blob blob-3 absolute -bottom-[16%] -left-[4%] h-[560px] w-[560px] opacity-[0.42] max-sm:h-[300px] max-sm:w-[300px]"
-              viewBox="0 0 600 600"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                fill="#2BB5B2"
-                d="M80,240 C50,140 170,60 290,70 C380,60 430,160 480,180 C550,210 540,320 490,390 C430,480 310,520 210,490 C110,470 30,400 40,320 C40,290 100,310 80,240 Z"
-              />
-            </svg>
-            {/* Bottom-right red — banana / comma shape */}
-            <svg
-              className="blob blob-4 absolute -bottom-[10%] -right-[6%] h-[520px] w-[520px] opacity-[0.42] max-sm:hidden"
-              viewBox="0 0 600 600"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                fill="#f84455"
-                d="M140,60 C260,20 410,90 470,210 C510,310 440,360 420,420 C380,500 250,520 160,470 C60,410 20,320 50,230 C70,170 110,140 140,60 Z"
-              />
-            </svg>
-            {/* Mid-left accent teal — small curly squiggle */}
-            <svg
-              className="blob blob-5 absolute left-[-3%] top-[38%] h-[220px] w-[220px] opacity-[0.40] max-sm:hidden"
-              viewBox="0 0 600 600"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                fill="#2BB5B2"
-                d="M180,60 C280,30 400,90 430,190 C460,290 400,400 300,430 C200,460 100,390 90,300 C80,210 120,130 180,60 Z"
-              />
-            </svg>
-          </div>
-
-          <div className="relative mx-auto max-w-[720px] text-center">
-            <StepsBar current={1} />
-
-            {/* Title — continues the ad's thought: provocation → resolution */}
-            <h1 className="mb-7 font-display text-[clamp(34px,4.8vw,60px)] font-normal leading-[1.15] tracking-tight text-brand-dark max-sm:text-[32px]">
-              <span className="hero-highlight">Creating a listing</span>
-              <br />
-              <span className="hero-highlight">is one thing.</span>
-              <br />
-              <span className="hero-highlight">Optimising it</span>
-              <br />
-              <span className="hero-highlight text-brand-tealDark">
-                for success
-              </span>
-              <br />
-              <span className="hero-highlight italic text-brand-red">
-                is another.
-              </span>
-            </h1>
-
-            {/* Subtitle — offer detail in soft prose */}
-            <p className="mx-auto mb-10 max-w-[540px] text-[15px] leading-relaxed text-brand-grey600">
-              Get your free AI listing game plan&nbsp;&mdash; scores, quick
-              wins, and ready-to-paste copy, in seconds.
-            </p>
-
-            {/* URL input */}
-            <div className="relative mx-auto mb-5 flex max-w-[560px] flex-col sm:block">
+              {/* Top-left red — kidney with a bulge pointing inward */}
               <svg
-                className="absolute left-[18px] top-1/2 -translate-y-1/2 text-brand-grey400 max-sm:top-7"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
+                className="blob blob-1 absolute -left-[8%] -top-[14%] h-[680px] w-[680px] opacity-[0.45] max-sm:h-[380px] max-sm:w-[380px]"
+                viewBox="0 0 600 600"
+                xmlns="http://www.w3.org/2000/svg"
               >
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                <path
+                  fill="#f84455"
+                  d="M100,170 C60,80 180,20 300,40 C440,60 560,160 540,300 C530,360 460,320 420,360 C400,400 460,440 420,500 C370,560 250,560 170,510 C60,440 20,340 60,260 C80,220 130,250 100,170 Z"
+                />
               </svg>
-              <input
-                type="text"
-                value={urlValue}
-                onChange={(e) => {
-                  setUrlValue(e.target.value);
-                  if (urlError) setUrlError(false);
-                }}
-                onKeyDown={(e) => e.key === "Enter" && submitUrl()}
-                placeholder="Paste your Airbnb listing URL"
-                className={`w-full rounded-[14px] border-2 bg-white py-[18px] pl-[52px] pr-[180px] font-sans text-base outline-none transition-all focus:border-brand-teal focus:shadow-[0_0_0_4px_rgba(43,181,178,.12)] max-sm:pr-4 max-sm:text-sm ${
-                  urlError ? "border-brand-red" : "border-brand-grey200"
-                }`}
-              />
-              <button
-                onClick={submitUrl}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-input bg-brand-red px-6 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.97] max-sm:relative max-sm:right-auto max-sm:top-auto max-sm:mt-3 max-sm:w-full max-sm:translate-y-0 max-sm:justify-center max-sm:rounded-xl max-sm:py-4"
+              {/* Top-right teal — wavy tongue with two bumps along the bottom */}
+              <svg
+                className="blob blob-2 absolute -right-[10%] top-[8%] h-[620px] w-[620px] opacity-[0.52] max-sm:h-[340px] max-sm:w-[340px]"
+                viewBox="0 0 600 600"
+                xmlns="http://www.w3.org/2000/svg"
               >
-                Try for free now
-                <span aria-hidden>&rarr;</span>
-              </button>
+                <path
+                  fill="#2BB5B2"
+                  d="M260,40 C400,20 530,100 550,220 C570,320 490,360 490,420 C490,470 420,510 330,500 C260,530 200,460 180,420 C150,390 60,420 40,330 C20,230 90,160 160,130 C210,110 170,60 260,40 Z"
+                />
+              </svg>
+              {/* Bottom-left teal — lopsided drop with a pointy top-right */}
+              <svg
+                className="blob blob-3 absolute -bottom-[16%] -left-[4%] h-[560px] w-[560px] opacity-[0.42] max-sm:h-[300px] max-sm:w-[300px]"
+                viewBox="0 0 600 600"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill="#2BB5B2"
+                  d="M80,240 C50,140 170,60 290,70 C380,60 430,160 480,180 C550,210 540,320 490,390 C430,480 310,520 210,490 C110,470 30,400 40,320 C40,290 100,310 80,240 Z"
+                />
+              </svg>
+              {/* Bottom-right red — banana / comma shape */}
+              <svg
+                className="blob blob-4 absolute -bottom-[10%] -right-[6%] h-[520px] w-[520px] opacity-[0.42] max-sm:hidden"
+                viewBox="0 0 600 600"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill="#f84455"
+                  d="M140,60 C260,20 410,90 470,210 C510,310 440,360 420,420 C380,500 250,520 160,470 C60,410 20,320 50,230 C70,170 110,140 140,60 Z"
+                />
+              </svg>
+              {/* Mid-left accent teal — small curly squiggle */}
+              <svg
+                className="blob blob-5 absolute left-[-3%] top-[38%] h-[220px] w-[220px] opacity-[0.40] max-sm:hidden"
+                viewBox="0 0 600 600"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill="#2BB5B2"
+                  d="M180,60 C280,30 400,90 430,190 C460,290 400,400 300,430 C200,460 100,390 90,300 C80,210 120,130 180,60 Z"
+                />
+              </svg>
             </div>
 
-            {/* Error */}
-            {urlError && (
-              <p className="mb-4 text-[13px] text-brand-red">
-                Please enter a valid Airbnb listing URL
+            <div className="relative mx-auto max-w-[720px] text-center">
+              <StepsBar current={1} showLabels />
+
+              {/* Title — direct echo of the ad headline ("Don't blame Airbnb…")
+                  keeps the emotional thread intact from click to load. */}
+              <h1 className="mb-6 font-display text-[clamp(40px,5.4vw,68px)] font-normal leading-[1.08] tracking-tight text-brand-dark max-sm:text-[34px]">
+                <span className="hero-highlight">
+                  Still think it&apos;s
+                </span>
+                <br />
+                <span className="hero-highlight italic text-brand-red">
+                  Airbnb&apos;s fault?
+                </span>
+              </h1>
+
+              {/* Subtitle — offer + speed, plain prose */}
+              <p className="mx-auto mb-8 max-w-[560px] text-[16px] leading-relaxed text-brand-grey600 max-sm:text-[15px]">
+                Paste your listing&nbsp;&mdash; Lucas scores it, finds the weak
+                spots, and hands you the fixes in under 60&nbsp;seconds.
               </p>
-            )}
 
-            {/* Helper */}
-            <div className="flex items-center justify-center gap-4 text-[13px] text-brand-grey400">
-              <span>100% free&nbsp;&mdash; no card required</span>
-              <span>&middot;</span>
-              <a
-                href="/sample"
-                className="font-medium text-brand-teal hover:text-brand-tealDark"
-              >
-                See a sample report
-              </a>
-            </div>
+              {/* URL input */}
+              <div className="relative mx-auto mb-4 flex max-w-[560px] flex-col sm:block">
+                <svg
+                  className="absolute left-[18px] top-1/2 -translate-y-1/2 text-brand-grey400 max-sm:top-7"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                </svg>
+                <input
+                  ref={heroInputRef}
+                  type="text"
+                  value={urlValue}
+                  onChange={(e) => {
+                    setUrlValue(e.target.value);
+                    if (urlError) setUrlError(false);
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && submitUrl()}
+                  placeholder="Paste your Airbnb listing URL"
+                  aria-invalid={urlError}
+                  aria-describedby={urlError ? "url-error" : undefined}
+                  className={`w-full rounded-[14px] border-2 bg-white py-[18px] pl-[52px] pr-[180px] font-sans text-base outline-none transition-all focus:border-brand-teal focus:shadow-[0_0_0_4px_rgba(43,181,178,.12)] max-sm:pr-4 max-sm:text-sm ${
+                    urlError ? "border-brand-red" : "border-brand-grey200"
+                  }`}
+                />
+                <button
+                  onClick={submitUrl}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-input bg-brand-red px-6 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.97] max-sm:relative max-sm:right-auto max-sm:top-auto max-sm:mt-3 max-sm:w-full max-sm:translate-y-0 max-sm:justify-center max-sm:rounded-xl max-sm:py-4"
+                >
+                  Try for free now
+                  <span aria-hidden>&rarr;</span>
+                </button>
+              </div>
 
-            {/* Trust strip */}
-            <div className="mt-[60px] flex flex-wrap justify-center gap-10 max-sm:gap-5">
-              <TrustItem
-                icon={
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                }
-                text="Secure & private"
-              />
-              <TrustItem
-                icon={
-                  <>
+              {/* Error — prominent pill so it can't be missed */}
+              {urlError && (
+                <div
+                  id="url-error"
+                  role="alert"
+                  aria-live="polite"
+                  className="mb-4 inline-flex items-center gap-2 rounded-input bg-brand-red/10 px-3 py-2 text-[13px] font-semibold text-brand-red"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
                     <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </>
-                }
-                text="Report in seconds"
-              />
-              <TrustItem
-                icon={
-                  <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
-                }
-                text="Copy-paste ready"
-              />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  Please paste a valid Airbnb listing URL (starts with airbnb.com/&hellip;)
+                </div>
+              )}
+
+              {/* Helper */}
+              <div className="flex items-center justify-center gap-4 text-[13px] text-brand-grey400">
+                <span>100% free&nbsp;&mdash; no card required</span>
+                <span>&middot;</span>
+                <a
+                  href="/sample"
+                  className="font-medium text-brand-teal hover:text-brand-tealDark"
+                >
+                  See a sample report
+                </a>
+              </div>
+
+              {/* ── Testimonial card — social proof at the decision point ── */}
+              <div className="mx-auto mt-8 flex max-w-[560px] items-center gap-4 rounded-card bg-white/85 p-4 text-left shadow-card backdrop-blur-sm max-sm:flex-col max-sm:gap-3 max-sm:text-center">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-brand-teal text-[18px] font-bold text-white">
+                  A
+                </div>
+                <div className="flex-1">
+                  <div className="mb-1 flex items-center gap-0.5 text-[13px] text-[#F5B042] max-sm:justify-center">
+                    <span aria-hidden>★★★★★</span>
+                    <span className="sr-only">5 out of 5 stars</span>
+                  </div>
+                  <p className="font-serif text-[15px] leading-snug text-brand-dark">
+                    &ldquo;It has improved my life. I was just guessing at what
+                    guests wanted &mdash; now I know exactly what to change.&rdquo;
+                  </p>
+                  <div className="mt-1.5 text-[11px] text-brand-grey400">
+                    <span className="font-semibold text-brand-grey600">Alex</span>
+                    &nbsp;&middot;&nbsp;Airbnb host &amp; Hello Hosty customer
+                  </div>
+                </div>
+              </div>
+
+              {/* Trust strip */}
+              <div className="mt-10 flex flex-wrap justify-center gap-10 max-sm:gap-5">
+                <TrustItem
+                  icon={
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  }
+                  text="Secure & private"
+                />
+                <TrustItem
+                  icon={
+                    <>
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </>
+                  }
+                  text="Report in seconds"
+                />
+                <TrustItem
+                  icon={
+                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+                  }
+                  text="Copy-paste ready"
+                />
+              </div>
+
+              {/* Scroll hint — nudge visitors to the proof section below */}
+              <div className="mt-10 text-center">
+                <a
+                  href="#what-you-get"
+                  className="inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-brand-grey400 transition-colors hover:text-brand-tealDark"
+                >
+                  See what&apos;s in the report
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </a>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+
+          {/* ════════════════════ PROOF: WHAT YOU GET ════════════════════ */}
+          <section
+            id="what-you-get"
+            className="relative border-t border-brand-grey200 bg-brand-mist px-6 py-16 sm:py-20"
+          >
+            <div className="mx-auto max-w-[1080px]">
+              <div className="text-center">
+                <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-brand-teal">
+                  What you get
+                </p>
+                <h2 className="mx-auto mt-3 max-w-[640px] font-display text-[clamp(26px,3.4vw,40px)] leading-tight text-brand-dark">
+                  A pro-grade review of your listing &mdash; free, in your
+                  inbox, in under&nbsp;2&nbsp;minutes.
+                </h2>
+              </div>
+
+              <div className="mt-10 grid gap-5 sm:grid-cols-3">
+                <FeatureCard
+                  title="Listing score"
+                  body="See exactly how your listing stacks up — title, photos, amenities, pricing, copy."
+                  icon={
+                    <>
+                      <path d="M3 3v18h18" />
+                      <path d="M7 15l4-4 4 4 5-5" />
+                    </>
+                  }
+                />
+                <FeatureCard
+                  title="Rewritten copy"
+                  body="The exact title, description and headlines — written to convert. Copy-paste ready."
+                  icon={
+                    <>
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                    </>
+                  }
+                />
+                <FeatureCard
+                  title="Ranked fixes"
+                  body="Your top quick wins, ordered by impact. No guessing what to change first."
+                  icon={
+                    <>
+                      <circle cx="12" cy="12" r="10" />
+                      <circle cx="12" cy="12" r="6" />
+                      <circle cx="12" cy="12" r="2" />
+                    </>
+                  }
+                />
+              </div>
+
+              <div className="mt-12 text-center">
+                <a
+                  href="/sample"
+                  className="inline-flex items-center gap-2 rounded-input border-2 border-brand-dark bg-white px-6 py-3 text-sm font-semibold text-brand-dark transition-colors hover:bg-brand-dark hover:text-white"
+                >
+                  See a live sample report
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </section>
+
+          {/* ════════════════════ FAQ MINI ════════════════════ */}
+          <section className="px-6 py-16 sm:py-20">
+            <div className="mx-auto max-w-3xl">
+              <div className="text-center">
+                <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-brand-teal">
+                  Things hosts ask
+                </p>
+                <h2 className="mt-3 font-display text-[clamp(24px,3vw,34px)] leading-tight text-brand-dark">
+                  A few practical questions
+                </h2>
+              </div>
+              <div className="mt-8 rounded-card bg-white p-6 shadow-card sm:p-8">
+                <FaqItem
+                  q="Is the first review actually free?"
+                  a="Yes — your first listing review is completely free. No card, no account. We ask for your email so we can send the PDF; that's the only string attached."
+                />
+                <FaqItem
+                  q="Do I need to connect my Airbnb account?"
+                  a="No. We work entirely from your public listing URL, the same way a guest browsing Airbnb would see it."
+                />
+                <FaqItem
+                  q="How long does it take?"
+                  a="Paste the URL, give us your email, and the report lands in your inbox in under 2 minutes."
+                />
+                <FaqItem
+                  q="Is my listing or guest data shared?"
+                  a="No. We analyse your public listing to generate your report — we don't resell, republish, or share it with anyone else."
+                  last
+                />
+              </div>
+              <p className="mt-6 text-center text-[13px] text-brand-grey400">
+                More questions? See the{" "}
+                <a
+                  href="/how-it-works"
+                  className="font-medium text-brand-teal hover:text-brand-tealDark"
+                >
+                  full walkthrough
+                </a>
+                .
+              </p>
+            </div>
+          </section>
+
+          {/* ════════════════════ FINAL CTA ════════════════════ */}
+          <section className="px-6 pb-24 pt-4">
+            <div className="mx-auto max-w-4xl rounded-card bg-gradient-to-br from-brand-dark to-brand-darkMid px-8 py-14 text-center text-white sm:px-16">
+              <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-brand-teal">
+                Ready in two minutes
+              </p>
+              <h2 className="mx-auto mt-3 max-w-[640px] font-display text-[clamp(28px,3.8vw,44px)] leading-tight">
+                Still think it&apos;s Airbnb&apos;s fault?
+              </h2>
+              <p className="mx-auto mt-4 max-w-[460px] text-[15px] leading-relaxed text-white/80">
+                Paste your listing and we&apos;ll show you what&apos;s actually
+                dragging your bookings down &mdash; in under 60 seconds.
+              </p>
+              <button
+                type="button"
+                onClick={focusHeroInput}
+                className="mt-8 inline-flex items-center gap-2 rounded-input bg-brand-red px-8 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.98]"
+              >
+                Get my free review
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+              <p className="mt-6 text-[12px] text-white/50">
+                100% free &middot; no card required &middot; report in under 2
+                minutes
+              </p>
+            </div>
+          </section>
+        </>
       )}
 
       {/* ════════════════════ STEP 2: EMAIL ════════════════════ */}
@@ -873,6 +1120,57 @@ function TrustItem({
         {icon}
       </svg>
       {text}
+    </div>
+  );
+}
+
+function FeatureCard({
+  icon,
+  title,
+  body,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="rounded-card bg-white p-7 text-left shadow-card">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-brand-tealLight text-brand-tealDark">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="h-5 w-5"
+        >
+          {icon}
+        </svg>
+      </div>
+      <h3 className="mb-2 font-serif text-[20px] font-semibold text-brand-dark">
+        {title}
+      </h3>
+      <p className="text-[14px] leading-relaxed text-brand-grey600">{body}</p>
+    </div>
+  );
+}
+
+function FaqItem({
+  q,
+  a,
+  last = false,
+}: {
+  q: string;
+  a: string;
+  last?: boolean;
+}) {
+  return (
+    <div
+      className={`${last ? "" : "border-b border-brand-grey200"} py-4 first:pt-0 last:pb-0`}
+    >
+      <h3 className="mb-1.5 font-serif text-[17px] font-semibold text-brand-dark">
+        {q}
+      </h3>
+      <p className="text-[14px] leading-relaxed text-brand-grey600">{a}</p>
     </div>
   );
 }
