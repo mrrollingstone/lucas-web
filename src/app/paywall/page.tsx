@@ -239,7 +239,9 @@ function MemberUpsellCard() {
       </p>
       <div className="mt-auto pt-6">
         <a
-          href="https://www.hellohosty.com/signup?utm_source=lucas&utm_medium=paywall"
+          href="https://calendly.com/hellohosty/call-with-clive?utm_source=lucas&utm_medium=paywall"
+          target="_blank"
+          rel="noopener noreferrer"
           className="block w-full rounded-xl bg-brand-teal px-6 py-4 text-center text-base font-semibold text-white transition-colors hover:bg-brand-tealDark active:scale-[.98]"
         >
           Start your free trial →
