@@ -104,20 +104,20 @@ body {
 }
 
 /* Two different durations per blob — drift vs morph never lock in phase */
-.blob-1      { animation: blobDrift1 52s ease-in-out infinite; }
-.blob-1 path { animation: blobMorph1 39s ease-in-out infinite; }
+.blob-1      { animation: blobDrift1 43s ease-in-out infinite; }
+.blob-1 path { animation: blobMorph1 33s ease-in-out infinite; }
 
-.blob-2      { animation: blobDrift2 63s ease-in-out infinite; animation-delay: -10s; }
-.blob-2 path { animation: blobMorph2 45s ease-in-out infinite; animation-delay: -7s; }
+.blob-2      { animation: blobDrift2 53s ease-in-out infinite; animation-delay: -8s; }
+.blob-2 path { animation: blobMorph2 38s ease-in-out infinite; animation-delay: -6s; }
 
-.blob-3      { animation: blobDrift3 55s ease-in-out infinite; animation-delay: -20s; }
-.blob-3 path { animation: blobMorph3 42s ease-in-out infinite; animation-delay: -15s; }
+.blob-3      { animation: blobDrift3 46s ease-in-out infinite; animation-delay: -17s; }
+.blob-3 path { animation: blobMorph3 35s ease-in-out infinite; animation-delay: -13s; }
 
-.blob-4      { animation: blobDrift4 67s ease-in-out infinite; animation-delay: -14s; }
-.blob-4 path { animation: blobMorph4 48s ease-in-out infinite; animation-delay: -18s; }
+.blob-4      { animation: blobDrift4 56s ease-in-out infinite; animation-delay: -12s; }
+.blob-4 path { animation: blobMorph4 40s ease-in-out infinite; animation-delay: -15s; }
 
-.blob-5      { animation: blobDrift5 46s ease-in-out infinite; animation-delay: -6s; }
-.blob-5 path { animation: blobMorph5 37s ease-in-out infinite; animation-delay: -11s; }
+.blob-5      { animation: blobDrift5 38s ease-in-out infinite; animation-delay: -5s; }
+.blob-5 path { animation: blobMorph5 31s ease-in-out infinite; animation-delay: -9s; }
 
 @media (prefers-reduced-motion: reduce) {
   .blob-1, .blob-2, .blob-3, .blob-4, .blob-5,
