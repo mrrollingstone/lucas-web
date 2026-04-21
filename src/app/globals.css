@@ -80,44 +80,44 @@ body {
 }
 
 /* Path morphs — same command structure as original, control points
-   perturbed 15–30px to produce a slow "breathe" that reads as the blob
+   perturbed ~18–36px to produce a slow "breathe" that reads as the blob
    growing a bulge here and flattening there. */
 @keyframes blobMorph1 {
   0%, 100% { d: path("M100,170 C60,80 180,20 300,40 C440,60 560,160 540,300 C530,360 460,320 420,360 C400,400 460,440 420,500 C370,560 250,560 170,510 C60,440 20,340 60,260 C80,220 130,250 100,170 Z"); }
-  50%      { d: path("M115,155 C75,95 195,35 320,55 C420,50 575,175 555,310 C540,355 445,335 405,380 C395,415 475,430 405,515 C380,555 265,570 150,495 C70,425 35,355 75,245 C95,225 120,270 115,155 Z"); }
+  50%      { d: path("M118,152 C78,98 198,38 324,58 C416,48 578,178 558,312 C542,354 442,338 402,384 C394,418 478,428 402,518 C382,554 268,572 146,492 C72,422 38,358 78,242 C98,226 118,274 118,152 Z"); }
 }
 @keyframes blobMorph2 {
   0%, 100% { d: path("M260,40 C400,20 530,100 550,220 C570,320 490,360 490,420 C490,470 420,510 330,500 C260,530 200,460 180,420 C150,390 60,420 40,330 C20,230 90,160 160,130 C210,110 170,60 260,40 Z"); }
-  50%      { d: path("M280,55 C410,40 545,120 560,230 C560,320 475,375 505,415 C495,465 410,525 325,510 C250,545 210,450 190,420 C160,400 45,435 55,345 C35,245 100,170 150,135 C215,110 190,80 280,55 Z"); }
+  50%      { d: path("M284,58 C412,44 548,124 562,232 C558,320 472,378 508,414 C496,464 408,528 324,512 C248,548 212,448 192,420 C162,402 42,438 58,348 C38,248 102,172 148,136 C216,110 194,84 284,58 Z"); }
 }
 @keyframes blobMorph3 {
   0%, 100% { d: path("M80,240 C50,140 170,60 290,70 C380,60 430,160 480,180 C550,210 540,320 490,390 C430,480 310,520 210,490 C110,470 30,400 40,320 C40,290 100,310 80,240 Z"); }
-  50%      { d: path("M95,230 C65,130 185,75 305,85 C395,50 420,175 495,170 C540,220 555,305 500,400 C445,475 305,535 200,475 C100,475 45,385 55,310 C50,285 115,325 95,230 Z"); }
+  50%      { d: path("M98,228 C68,128 188,78 308,88 C398,48 418,178 498,168 C538,222 558,302 502,402 C448,474 304,538 198,472 C98,476 48,382 58,308 C52,284 118,328 98,228 Z"); }
 }
 @keyframes blobMorph4 {
   0%, 100% { d: path("M140,60 C260,20 410,90 470,210 C510,310 440,360 420,420 C380,500 250,520 160,470 C60,410 20,320 50,230 C70,170 110,140 140,60 Z"); }
-  50%      { d: path("M160,75 C275,35 395,105 485,220 C500,300 430,380 410,435 C370,485 260,540 145,460 C75,395 35,315 40,220 C85,180 120,145 160,75 Z"); }
+  50%      { d: path("M164,78 C278,38 392,108 488,222 C498,298 428,384 408,438 C368,482 262,544 142,458 C78,392 38,314 38,218 C88,182 122,146 164,78 Z"); }
 }
 @keyframes blobMorph5 {
   0%, 100% { d: path("M180,60 C280,30 400,90 430,190 C460,290 400,400 300,430 C200,460 100,390 90,300 C80,210 120,130 180,60 Z"); }
-  50%      { d: path("M195,75 C295,45 415,100 445,200 C455,285 415,395 285,440 C195,465 105,400 75,285 C90,225 135,140 195,75 Z"); }
+  50%      { d: path("M198,78 C298,48 418,102 448,202 C454,284 418,394 282,442 C194,466 106,402 72,282 C92,228 138,142 198,78 Z"); }
 }
 
 /* Two different durations per blob — drift vs morph never lock in phase */
-.blob-1      { animation: blobDrift1 62s ease-in-out infinite; }
-.blob-1 path { animation: blobMorph1 47s ease-in-out infinite; }
+.blob-1      { animation: blobDrift1 52s ease-in-out infinite; }
+.blob-1 path { animation: blobMorph1 39s ease-in-out infinite; }
 
-.blob-2      { animation: blobDrift2 75s ease-in-out infinite; animation-delay: -12s; }
-.blob-2 path { animation: blobMorph2 54s ease-in-out infinite; animation-delay: -9s; }
+.blob-2      { animation: blobDrift2 63s ease-in-out infinite; animation-delay: -10s; }
+.blob-2 path { animation: blobMorph2 45s ease-in-out infinite; animation-delay: -7s; }
 
-.blob-3      { animation: blobDrift3 66s ease-in-out infinite; animation-delay: -24s; }
-.blob-3 path { animation: blobMorph3 50s ease-in-out infinite; animation-delay: -18s; }
+.blob-3      { animation: blobDrift3 55s ease-in-out infinite; animation-delay: -20s; }
+.blob-3 path { animation: blobMorph3 42s ease-in-out infinite; animation-delay: -15s; }
 
-.blob-4      { animation: blobDrift4 80s ease-in-out infinite; animation-delay: -17s; }
-.blob-4 path { animation: blobMorph4 58s ease-in-out infinite; animation-delay: -22s; }
+.blob-4      { animation: blobDrift4 67s ease-in-out infinite; animation-delay: -14s; }
+.blob-4 path { animation: blobMorph4 48s ease-in-out infinite; animation-delay: -18s; }
 
-.blob-5      { animation: blobDrift5 55s ease-in-out infinite; animation-delay: -7s; }
-.blob-5 path { animation: blobMorph5 44s ease-in-out infinite; animation-delay: -13s; }
+.blob-5      { animation: blobDrift5 46s ease-in-out infinite; animation-delay: -6s; }
+.blob-5 path { animation: blobMorph5 37s ease-in-out infinite; animation-delay: -11s; }
 
 @media (prefers-reduced-motion: reduce) {
   .blob-1, .blob-2, .blob-3, .blob-4, .blob-5,
