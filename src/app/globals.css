@@ -39,55 +39,89 @@ body {
 }
 
 /* ── Lava-lamp blobs ──
-   Each blob has its own keyframe so durations/phases are unsynced. The
-   baseline rotation is baked into every frame (CSS animation wins over
-   inline transform, so we keep the look by declaring it here). Using
-   translate + scale(x,y) + skew gives the "changing shape" impression
-   without actually morphing the SVG path, which is cheap and buttery
-   smooth on the GPU. */
+   Two animations per blob, on two elements, at two different durations:
+   the <svg> drifts (transform) and the inner <path> actually morphs (d).
+   The mismatched periods are what keep them from ever locking into the
+   same phase — that's the trick behind the lava-lamp feel. Kept slow &
+   calm (nothing under a minute) and eased, so motion is near-ambient. */
 .blob {
   transform-origin: center;
   transform-box: fill-box;
   will-change: transform;
 }
+.blob path {
+  will-change: d;
+}
 
+/* Drift — rotate + translate + gentle asymmetric scale */
 @keyframes blobDrift1 {
-  0%, 100% { transform: rotate(18deg) translate(0, 0) scale(1, 1) skew(0deg, 0deg); }
-  25%      { transform: rotate(34deg) translate(70px, -55px) scale(1.18, 0.82) skew(-12deg, 6deg); }
-  50%      { transform: rotate(6deg) translate(-50px, 75px) scale(0.84, 1.22) skew(10deg, -10deg); }
-  75%      { transform: rotate(28deg) translate(55px, 40px) scale(1.1, 0.94) skew(-7deg, 12deg); }
+  0%, 100% { transform: rotate(18deg)  translate(0, 0)     scale(1, 1); }
+  33%      { transform: rotate(23deg)  translate(30px, -22px) scale(1.05, 0.96); }
+  66%      { transform: rotate(14deg)  translate(-22px, 28px) scale(0.96, 1.05); }
 }
-
 @keyframes blobDrift2 {
-  0%, 100% { transform: rotate(-18deg) translate(0, 0) scale(1, 1) skew(0deg, 0deg); }
-  33%      { transform: rotate(-4deg) translate(-65px, 55px) scale(1.17, 0.86) skew(10deg, -9deg); }
-  66%      { transform: rotate(-30deg) translate(48px, -70px) scale(0.86, 1.18) skew(-9deg, 8deg); }
+  0%, 100% { transform: rotate(-18deg) translate(0, 0)     scale(1, 1); }
+  40%      { transform: rotate(-12deg) translate(-28px, 24px) scale(1.05, 0.97); }
+  70%      { transform: rotate(-24deg) translate(22px, -26px) scale(0.97, 1.05); }
 }
-
 @keyframes blobDrift3 {
-  0%, 100% { transform: rotate(32deg) translate(0, 0) scale(1, 1) skew(0deg, 0deg); }
-  30%      { transform: rotate(22deg) translate(60px, -48px) scale(1.22, 0.8) skew(-14deg, 7deg); }
-  60%      { transform: rotate(44deg) translate(-55px, 60px) scale(0.82, 1.25) skew(12deg, -8deg); }
+  0%, 100% { transform: rotate(32deg)  translate(0, 0)     scale(1, 1); }
+  33%      { transform: rotate(28deg)  translate(26px, -20px) scale(1.06, 0.95); }
+  66%      { transform: rotate(36deg)  translate(-24px, 24px) scale(0.95, 1.06); }
 }
-
 @keyframes blobDrift4 {
-  0%, 100% { transform: rotate(-22deg) translate(0, 0) scale(1, 1) skew(0deg, 0deg); }
-  40%      { transform: rotate(-10deg) translate(-75px, -42px) scale(1.15, 1.04) skew(8deg, -13deg); }
-  70%      { transform: rotate(-34deg) translate(42px, 65px) scale(0.85, 1.14) skew(-10deg, 10deg); }
+  0%, 100% { transform: rotate(-22deg) translate(0, 0)     scale(1, 1); }
+  40%      { transform: rotate(-16deg) translate(-30px, -18px) scale(1.05, 1.02); }
+  70%      { transform: rotate(-28deg) translate(20px, 26px) scale(0.96, 1.05); }
 }
-
 @keyframes blobDrift5 {
-  0%, 100% { transform: rotate(45deg) translate(0, 0) scale(1, 1) skew(0deg, 0deg); }
-  33%      { transform: rotate(70deg) translate(55px, -50px) scale(1.3, 0.78) skew(-16deg, 12deg); }
-  66%      { transform: rotate(20deg) translate(-45px, 55px) scale(0.8, 1.28) skew(14deg, -14deg); }
+  0%, 100% { transform: rotate(45deg)  translate(0, 0)     scale(1, 1); }
+  50%      { transform: rotate(52deg)  translate(22px, -20px) scale(1.08, 0.94); }
 }
 
-.blob-1 { animation: blobDrift1 18s ease-in-out infinite; }
-.blob-2 { animation: blobDrift2 22s ease-in-out infinite; animation-delay: -4s; }
-.blob-3 { animation: blobDrift3 20s ease-in-out infinite; animation-delay: -9s; }
-.blob-4 { animation: blobDrift4 25s ease-in-out infinite; animation-delay: -6s; }
-.blob-5 { animation: blobDrift5 14s ease-in-out infinite; animation-delay: -2s; }
+/* Path morphs — same command structure as original, control points
+   perturbed 15–30px to produce a slow "breathe" that reads as the blob
+   growing a bulge here and flattening there. */
+@keyframes blobMorph1 {
+  0%, 100% { d: path("M100,170 C60,80 180,20 300,40 C440,60 560,160 540,300 C530,360 460,320 420,360 C400,400 460,440 420,500 C370,560 250,560 170,510 C60,440 20,340 60,260 C80,220 130,250 100,170 Z"); }
+  50%      { d: path("M115,155 C75,95 195,35 320,55 C420,50 575,175 555,310 C540,355 445,335 405,380 C395,415 475,430 405,515 C380,555 265,570 150,495 C70,425 35,355 75,245 C95,225 120,270 115,155 Z"); }
+}
+@keyframes blobMorph2 {
+  0%, 100% { d: path("M260,40 C400,20 530,100 550,220 C570,320 490,360 490,420 C490,470 420,510 330,500 C260,530 200,460 180,420 C150,390 60,420 40,330 C20,230 90,160 160,130 C210,110 170,60 260,40 Z"); }
+  50%      { d: path("M280,55 C410,40 545,120 560,230 C560,320 475,375 505,415 C495,465 410,525 325,510 C250,545 210,450 190,420 C160,400 45,435 55,345 C35,245 100,170 150,135 C215,110 190,80 280,55 Z"); }
+}
+@keyframes blobMorph3 {
+  0%, 100% { d: path("M80,240 C50,140 170,60 290,70 C380,60 430,160 480,180 C550,210 540,320 490,390 C430,480 310,520 210,490 C110,470 30,400 40,320 C40,290 100,310 80,240 Z"); }
+  50%      { d: path("M95,230 C65,130 185,75 305,85 C395,50 420,175 495,170 C540,220 555,305 500,400 C445,475 305,535 200,475 C100,475 45,385 55,310 C50,285 115,325 95,230 Z"); }
+}
+@keyframes blobMorph4 {
+  0%, 100% { d: path("M140,60 C260,20 410,90 470,210 C510,310 440,360 420,420 C380,500 250,520 160,470 C60,410 20,320 50,230 C70,170 110,140 140,60 Z"); }
+  50%      { d: path("M160,75 C275,35 395,105 485,220 C500,300 430,380 410,435 C370,485 260,540 145,460 C75,395 35,315 40,220 C85,180 120,145 160,75 Z"); }
+}
+@keyframes blobMorph5 {
+  0%, 100% { d: path("M180,60 C280,30 400,90 430,190 C460,290 400,400 300,430 C200,460 100,390 90,300 C80,210 120,130 180,60 Z"); }
+  50%      { d: path("M195,75 C295,45 415,100 445,200 C455,285 415,395 285,440 C195,465 105,400 75,285 C90,225 135,140 195,75 Z"); }
+}
+
+/* Two different durations per blob — drift vs morph never lock in phase */
+.blob-1      { animation: blobDrift1 62s ease-in-out infinite; }
+.blob-1 path { animation: blobMorph1 47s ease-in-out infinite; }
+
+.blob-2      { animation: blobDrift2 75s ease-in-out infinite; animation-delay: -12s; }
+.blob-2 path { animation: blobMorph2 54s ease-in-out infinite; animation-delay: -9s; }
+
+.blob-3      { animation: blobDrift3 66s ease-in-out infinite; animation-delay: -24s; }
+.blob-3 path { animation: blobMorph3 50s ease-in-out infinite; animation-delay: -18s; }
+
+.blob-4      { animation: blobDrift4 80s ease-in-out infinite; animation-delay: -17s; }
+.blob-4 path { animation: blobMorph4 58s ease-in-out infinite; animation-delay: -22s; }
+
+.blob-5      { animation: blobDrift5 55s ease-in-out infinite; animation-delay: -7s; }
+.blob-5 path { animation: blobMorph5 44s ease-in-out infinite; animation-delay: -13s; }
 
 @media (prefers-reduced-motion: reduce) {
-  .blob-1, .blob-2, .blob-3, .blob-4, .blob-5 { animation: none; }
+  .blob-1, .blob-2, .blob-3, .blob-4, .blob-5,
+  .blob-1 path, .blob-2 path, .blob-3 path, .blob-4 path, .blob-5 path {
+    animation: none;
+  }
 }
