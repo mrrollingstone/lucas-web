@@ -194,6 +194,64 @@ export function LandingFunnel() {
     };
   }, [showUrlModal]);
 
+  /* "Email me a link to finish later" escape-hatch modal — Step 1
+   * Captures people who don't have their Airbnb URL to hand (most Meta-ad
+   * mobile traffic). POSTs to /api/later-link, which tags them in Mailchimp
+   * and sends a transactional email with a prefilled magic link. */
+  const [showLaterModal, setShowLaterModal] = useState(false);
+  const [laterEmail, setLaterEmail] = useState("");
+  const [laterError, setLaterError] = useState(false);
+  const [laterSubmitting, setLaterSubmitting] = useState(false);
+  const [laterSent, setLaterSent] = useState(false);
+
+  useEffect(() => {
+    if (!showLaterModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowLaterModal(false);
+    };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showLaterModal]);
+
+  const submitLater = useCallback(async () => {
+    const email = laterEmail.trim();
+    if (!email || !email.includes("@") || !email.includes(".")) {
+      setLaterError(true);
+      return;
+    }
+    setLaterError(false);
+    setLaterSubmitting(true);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const res = await fetch("/api/later-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          utm_source: params.get("utm_source") || undefined,
+          utm_campaign: params.get("utm_campaign") || undefined,
+        }),
+      });
+      if (res.ok) {
+        fbqTrack("Lead", { content_name: "lucas-later-link" });
+        setLaterSent(true);
+      } else {
+        setLaterError(true);
+      }
+    } catch {
+      // Network blip — optimistically flip to success; the contact will have
+      // been upserted on the server side in most cases.
+      setLaterSent(true);
+    } finally {
+      setLaterSubmitting(false);
+    }
+  }, [laterEmail]);
+
   /* ─── Navigation ─── */
   const goToStep = useCallback(
     (n: 1 | 2 | 3) => {
@@ -474,6 +532,128 @@ export function LandingFunnel() {
         </div>
       )}
 
+      {/* ── "Email me a link to finish later" escape-hatch modal ── */}
+      {showLaterModal && (
+        <div
+          className="animate-fade-up fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm"
+          onClick={() => setShowLaterModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="later-modal-title"
+        >
+          <div
+            className="relative w-full max-w-[520px] rounded-card bg-white p-8 shadow-cardLg max-sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowLaterModal(false)}
+              aria-label="Close"
+              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-brand-grey400 transition-colors hover:bg-brand-grey200 hover:text-brand-dark"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+
+            {!laterSent ? (
+              <>
+                <h2
+                  id="later-modal-title"
+                  className="mb-2 text-center font-serif text-[26px] font-semibold text-brand-dark max-sm:text-[22px]"
+                >
+                  Email me a link to finish later
+                </h2>
+                <p className="mb-6 text-center text-sm leading-relaxed text-brand-grey600">
+                  Pop your email in and we&apos;ll send you a link. Grab your
+                  Airbnb URL when you&apos;ve got a minute, tap the link, and
+                  your free review is 60 seconds away.
+                </p>
+
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={laterEmail}
+                  onChange={(e) => {
+                    setLaterEmail(e.target.value);
+                    if (laterError) setLaterError(false);
+                  }}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && !laterSubmitting && submitLater()
+                  }
+                  placeholder="you@example.com"
+                  autoFocus
+                  disabled={laterSubmitting}
+                  className={`w-full rounded-[14px] border-2 bg-white px-4 py-3.5 font-sans text-base outline-none transition-all focus:border-brand-teal focus:shadow-[0_0_0_4px_rgba(43,181,178,.12)] ${
+                    laterError ? "border-brand-red" : "border-brand-grey200"
+                  }`}
+                />
+                {laterError && (
+                  <p className="mt-2 text-[13px] text-brand-red">
+                    Please enter a valid email address
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={submitLater}
+                  disabled={laterSubmitting}
+                  className="mt-5 w-full rounded-xl bg-brand-red px-6 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {laterSubmitting ? "Sending\u2026" : "Email me the link"}
+                </button>
+
+                <p className="mt-4 text-center text-[13px] text-brand-grey400">
+                  We&apos;ll only email you about your free review.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-teal/10 text-brand-teal">
+                  <svg
+                    width="30"
+                    height="30"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <h2 className="mb-2 text-center font-serif text-[26px] font-semibold text-brand-dark max-sm:text-[22px]">
+                  Link is on its way
+                </h2>
+                <p className="mb-6 text-center text-sm leading-relaxed text-brand-grey600">
+                  Check <strong>{laterEmail}</strong> in the next minute or two
+                  for your link. When you&apos;re ready, grab your Airbnb
+                  listing URL, tap the button in the email, and paste it in.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowLaterModal(false)}
+                  className="w-full rounded-xl bg-brand-teal px-6 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-tealDark active:scale-[.98]"
+                >
+                  Got it
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Floating key video ── */}
       <div className="pointer-events-none fixed -bottom-5 -right-5 z-50 h-[200px] w-[200px] opacity-30 drop-shadow-[0_8px_32px_rgba(0,0,0,.15)] sm:h-[200px] sm:w-[200px] max-sm:h-[120px] max-sm:w-[120px]">
         <video
@@ -647,6 +827,24 @@ export function LandingFunnel() {
                 >
                   See a sample report
                 </a>
+              </div>
+
+              {/* Escape hatch — for visitors without their Airbnb URL to hand
+               * (most Meta-ad mobile traffic). Captures email + fires a
+               * transactional "here's your link" email via /api/later-link. */}
+              <div className="mt-4 text-[13px] text-brand-grey600">
+                Don&apos;t have your listing URL handy?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLaterSent(false);
+                    setLaterError(false);
+                    setShowLaterModal(true);
+                  }}
+                  className="font-semibold text-brand-teal underline-offset-2 hover:text-brand-tealDark hover:underline"
+                >
+                  Email me a link to finish later &rarr;
+                </button>
               </div>
 
               {/* ── Testimonial card — social proof at the decision point ── */}
