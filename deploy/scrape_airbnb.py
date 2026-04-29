@@ -150,44 +150,112 @@ def open_reviews_modal(page) -> bool:
     return False
 
 
-def scroll_reviews_modal(page, max_rounds: int = 60) -> None:
-    """Scroll the reviews modal until no new reviews load (or cap)."""
+def scroll_reviews_modal(
+    page,
+    max_rounds: int = 200,
+    stagnant_limit: int = 8,
+    settle_ms: int = 1100,
+    expected_count: Optional[int] = None,
+) -> int:
+    """Scroll the reviews modal until no new reviews load (or cap reached).
+
+    Notes
+    -----
+    The previous version exited far too early: 60 rounds with 3 stagnant
+    rounds and a 600ms settle is enough for ~10 reviews on a fast network,
+    but listings with 30+ reviews routinely stalled. Three concrete fixes:
+
+      1. Scroll EVERY scrollable descendant, not just the first one. Airbnb
+         occasionally wraps the virtualised list in two scroll containers.
+      2. After setting scrollTop, dispatch a real 'scroll' event AND fire a
+         wheel event — virtualised lists frequently subscribe to those rather
+         than polling scrollTop.
+      3. Be much more patient: 200 rounds, 8 stagnant rounds, 1.1s settle.
+         A typical 50-review listing finishes in ~12 rounds; the cap exists
+         only to stop runaway loops.
+
+    If ``expected_count`` is given, we keep scrolling past stagnant rounds
+    until we hit it (or burn the round budget) — this rescues the common
+    case where the inner list briefly stalls between batches.
+    """
     last_count = -1
     stagnant = 0
-    for _ in range(max_rounds):
+    for round_idx in range(max_rounds):
         page.evaluate(
             """
             () => {
               const dlg = document.querySelector("div[role='dialog']");
               if (!dlg) return;
-              // Find the scrollable descendant (Airbnb nests a virtualised list).
-              const nodes = dlg.querySelectorAll('*');
-              let target = dlg;
-              for (const n of nodes) {
+              // Collect every scrollable descendant — older Airbnb rollouts
+              // nested the actual virtualised scroller two layers deep.
+              const scrollers = [];
+              const all = dlg.querySelectorAll('*');
+              for (const n of all) {
                 const s = getComputedStyle(n);
                 if ((s.overflowY === 'auto' || s.overflowY === 'scroll')
-                    && n.scrollHeight > n.clientHeight) {
-                  target = n;
-                  break;
+                    && n.scrollHeight > n.clientHeight + 4) {
+                  scrollers.push(n);
                 }
               }
-              target.scrollTop = target.scrollHeight;
+              // Always include the dialog itself as a fallback target.
+              if (!scrollers.includes(dlg)) scrollers.push(dlg);
+
+              for (const target of scrollers) {
+                const before = target.scrollTop;
+                target.scrollTop = target.scrollHeight;
+                // Dispatch real events — virtualised lists ignore raw
+                // scrollTop assignments on some Chrome versions.
+                target.dispatchEvent(new Event('scroll', { bubbles: true }));
+                try {
+                  target.dispatchEvent(new WheelEvent('wheel', {
+                    bubbles: true, cancelable: true,
+                    deltaY: Math.max(800, target.clientHeight),
+                  }));
+                } catch (e) { /* WheelEvent unsupported in old browsers */ }
+                // If scrolling didn't advance, nudge with a small reverse
+                // then forward to re-arm scroll listeners.
+                if (target.scrollTop === before && target.scrollHeight > target.clientHeight) {
+                  target.scrollTop = Math.max(0, before - 120);
+                  target.dispatchEvent(new Event('scroll', { bubbles: true }));
+                  target.scrollTop = target.scrollHeight;
+                }
+              }
             }
             """
         )
-        time.sleep(0.6)
+        # Also press End on the focused dialog — works when no scrollable
+        # descendant exists (focus lives inside the modal already).
+        try:
+            page.keyboard.press("End")
+        except Exception:
+            pass
+        time.sleep(settle_ms / 1000)
         count = page.evaluate(
-            """() => document.querySelectorAll("div[role='dialog'] [data-review-id], "
-               + "div[role='dialog'] div[aria-label^='Rating'], "
-               + "div[role='dialog'] [data-testid='pdp-review-card']").length"""
+            """() => document.querySelectorAll(
+                  "div[role='dialog'] [data-review-id], "
+                + "div[role='dialog'] div[aria-label^='Rating'], "
+                + "div[role='dialog'] [data-testid='pdp-review-card'], "
+                + "div[role='dialog'] [id^='review_'], "
+                + "div[role='dialog'] [role='listitem']"
+              ).length"""
         )
         if count <= last_count:
             stagnant += 1
-            if stagnant >= 3:
+            # If the platform tells us how many to expect and we're still
+            # short by a meaningful margin, push past stagnant detection.
+            if expected_count and count < expected_count and stagnant < (stagnant_limit * 2):
+                continue
+            if stagnant >= stagnant_limit:
                 break
         else:
             stagnant = 0
             last_count = count
+    print(
+        f"INFO: scroll_reviews_modal finished round={round_idx + 1} "
+        f"final_count={last_count} expected={expected_count}",
+        file=sys.stderr,
+    )
+    return max(0, last_count)
 
 
 # ---------------------------------------------------------------------------
@@ -446,13 +514,121 @@ def extract_from_niobe(state: dict) -> dict:
         out["pricing"]["currency"] = sdp.get("currency") or _guess_currency(str(amt))
 
     # Reviews (summary only; full list extracted via modal scrape)
-    review_summary = first(
-        _walk(state, lambda d: "reviewsCount" in d and "overallRating" in d),
+    #
+    # Airbnb's schema drifts frequently. The count/rating live under several
+    # different key names depending on the rollout; we try each in priority
+    # order and record which one hit so future drift is easy to debug.
+    #
+    # Observed schemas (as of 2026-04):
+    #   a) PdpReviewsSection style   → {overallCount: 24, overallRating: 4.83,
+    #                                   seeAllReviewsButton: {title: "Show all 24 reviews"}}
+    #   b) Sharing/metadata node     → {reviewCount: 24, starRating: 4.83}
+    #   c) PdpOverviewV2ReviewData   → {reviewCount: "24", reviewCountText: "24 reviews",
+    #                                   ratingText: "4.83"}
+    #   d) Breakdown ratings node    → {visibleReviewCount: "24", guestSatisfactionOverall: 4.83,
+    #                                   cleanlinessRating: …, accuracyRating: …, …}
+    #   e) Legacy (pre-2025)         → {reviewsCount: 24, overallRating: 4.83,
+    #                                   cleanlinessRating: …}
+    def _to_int(v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            m = re.search(r"\d+", v)
+            if m:
+                try:
+                    return int(m.group(0))
+                except ValueError:
+                    return None
+        return None
+
+    def _to_float(v):
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, str):
+            m = re.search(r"\d+(?:\.\d+)?", v)
+            if m:
+                try:
+                    return float(m.group(0))
+                except ValueError:
+                    return None
+        return None
+
+    review_count_candidates: list[tuple[int, str]] = []
+    review_rating_candidates: list[tuple[float, str]] = []
+
+    # (a) Rich review summary node — most authoritative: it's literally the
+    # node that drives the "Show all N reviews" button the user sees.
+    a_node = first(
+        _walk(state, lambda d: "overallCount" in d and "overallRating" in d),
         None,
     )
-    if review_summary:
-        out["reviews"]["count"] = review_summary.get("reviewsCount")
-        out["reviews"]["average_rating"] = review_summary.get("overallRating")
+    if a_node:
+        c = _to_int(a_node.get("overallCount"))
+        r = _to_float(a_node.get("overallRating"))
+        if c is not None:
+            review_count_candidates.append((c, "overallCount"))
+        if r is not None:
+            review_rating_candidates.append((r, "overallRating(a)"))
+        # Cross-check against the button text — Airbnb sometimes de-syncs
+        # the int field but the button label is always user-facing truth.
+        btn = a_node.get("seeAllReviewsButton") or {}
+        btn_label = btn.get("accessibilityLabel") or btn.get("title") or ""
+        m = re.search(r"(\d[\d,]*)\s*review", btn_label, re.I)
+        if m:
+            try:
+                review_count_candidates.append(
+                    (int(m.group(1).replace(",", "")), "seeAllReviewsButton")
+                )
+            except ValueError:
+                pass
+
+    # (b) Sharing/metadata node — {reviewCount: int, starRating: float}
+    b_node = first(
+        _walk(state, lambda d: "reviewCount" in d and "starRating" in d),
+        None,
+    )
+    if b_node:
+        c = _to_int(b_node.get("reviewCount"))
+        r = _to_float(b_node.get("starRating"))
+        if c is not None:
+            review_count_candidates.append((c, "reviewCount+starRating"))
+        if r is not None:
+            review_rating_candidates.append((r, "starRating"))
+
+    # (c) PdpOverviewV2ReviewData — {reviewCount: "24", reviewCountText: "24 reviews"}
+    c_node = first(
+        _walk(state, lambda d: "reviewCountText" in d or d.get("__typename") == "PdpOverviewV2ReviewData"),
+        None,
+    )
+    if c_node:
+        c = _to_int(c_node.get("reviewCount")) or _to_int(c_node.get("reviewCountText"))
+        r = _to_float(c_node.get("ratingText"))
+        if c is not None:
+            review_count_candidates.append((c, "PdpOverviewV2ReviewData"))
+        if r is not None:
+            review_rating_candidates.append((r, "ratingText"))
+
+    # (d) Breakdown ratings node — {visibleReviewCount, guestSatisfactionOverall,
+    # cleanlinessRating, …}. Also carries the category breakdown, which on the
+    # modern schema is *separate* from the headline summary node.
+    d_node = first(
+        _walk(
+            state,
+            lambda d: (
+                "cleanlinessRating" in d
+                and ("guestSatisfactionOverall" in d or "visibleReviewCount" in d
+                     or "overallRating" in d or "reviewsCount" in d)
+            ),
+        ),
+        None,
+    )
+    if d_node:
+        c = _to_int(d_node.get("visibleReviewCount")) or _to_int(d_node.get("reviewsCount"))
+        r = _to_float(d_node.get("guestSatisfactionOverall")) or _to_float(d_node.get("overallRating"))
+        if c is not None:
+            review_count_candidates.append((c, "visibleReviewCount"))
+        if r is not None:
+            review_rating_candidates.append((r, "guestSatisfactionOverall"))
         breakdown = {}
         for k_src, k_dst in [
             ("cleanlinessRating", "cleanliness"),
@@ -462,10 +638,77 @@ def extract_from_niobe(state: dict) -> dict:
             ("locationRating", "location"),
             ("valueRating", "value"),
         ]:
-            if k_src in review_summary:
-                breakdown[k_dst] = review_summary[k_src]
+            if d_node.get(k_src) is not None:
+                breakdown[k_dst] = d_node[k_src]
         if breakdown:
             out["reviews"]["breakdown"] = breakdown
+
+    # (e) Legacy path — pre-2025 key name
+    e_node = first(
+        _walk(state, lambda d: "reviewsCount" in d and "overallRating" in d),
+        None,
+    )
+    if e_node:
+        c = _to_int(e_node.get("reviewsCount"))
+        r = _to_float(e_node.get("overallRating"))
+        if c is not None:
+            review_count_candidates.append((c, "reviewsCount(legacy)"))
+        if r is not None:
+            review_rating_candidates.append((r, "overallRating(legacy)"))
+        if not out["reviews"].get("breakdown"):
+            breakdown = {}
+            for k_src, k_dst in [
+                ("cleanlinessRating", "cleanliness"),
+                ("accuracyRating", "accuracy"),
+                ("checkinRating", "checkin"),
+                ("communicationRating", "communication"),
+                ("locationRating", "location"),
+                ("valueRating", "value"),
+            ]:
+                if e_node.get(k_src) is not None:
+                    breakdown[k_dst] = e_node[k_src]
+            if breakdown:
+                out["reviews"]["breakdown"] = breakdown
+
+    # Pick the winning candidate. When multiple schemas agree, take the
+    # majority value; if they disagree, prefer the richer PdpReviewsSection
+    # (source "a") because that's the one wired to the user-visible button.
+    if review_count_candidates:
+        from collections import Counter
+        values = [v for v, _ in review_count_candidates]
+        counter = Counter(values)
+        top_value, top_hits = counter.most_common(1)[0]
+        if top_hits > 1:
+            chosen_count = top_value
+        else:
+            priority = {"seeAllReviewsButton": 0, "overallCount": 1,
+                        "reviewCount+starRating": 2, "PdpOverviewV2ReviewData": 3,
+                        "visibleReviewCount": 4, "reviewsCount(legacy)": 5}
+            chosen_count = sorted(
+                review_count_candidates,
+                key=lambda vs: priority.get(vs[1], 99),
+            )[0][0]
+        out["reviews"]["count"] = chosen_count
+        out["reviews"]["_count_sources"] = [
+            {"value": v, "source": s} for v, s in review_count_candidates
+        ]
+        print(
+            f"INFO: Niobe review count = {chosen_count} "
+            f"(candidates: {review_count_candidates})",
+            file=sys.stderr,
+        )
+
+    if review_rating_candidates:
+        # Average the candidates — they should all agree. If they don't,
+        # log it so we can spot drift.
+        uniq = sorted({round(r, 2) for r, _ in review_rating_candidates})
+        if len(uniq) > 1:
+            print(
+                f"WARN: Niobe rating candidates disagree: "
+                f"{review_rating_candidates}",
+                file=sys.stderr,
+            )
+        out["reviews"]["average_rating"] = review_rating_candidates[0][0]
 
     # Reviews from Niobe state (primary source — doesn't require modal interaction)
     # Broad set of review type names to handle Airbnb schema changes
@@ -875,6 +1118,81 @@ def _dom_fallbacks(page, data: dict) -> None:
         except Exception:
             pass
 
+    # Review count + rating — last-resort DOM fallback when the Niobe walk
+    # missed (e.g. after a schema rename). We read the headline number from
+    # the user-visible "Show all N reviews" button, the reviews h2 ("4.83 · 24
+    # reviews"), or the aria-label ("Rated 4.83 out of 5 stars from 24 reviews").
+    # NEVER infer the count from len(extracted_reviews) — that's what produced
+    # the old "2 reviews" regression when the modal/inline scrape got stuck on
+    # two DOM fragments.
+    if not data["reviews"].get("count") or not data["reviews"].get("average_rating"):
+        try:
+            dom_rev = page.evaluate(
+                r"""() => {
+                    const result = { count: null, rating: null, source: null };
+                    const texts = new Set();
+
+                    // Collect candidate text sources in priority order
+                    const sources = [];
+                    document.querySelectorAll('[aria-label*="review" i]').forEach(el => {
+                        const a = el.getAttribute('aria-label');
+                        if (a) sources.push({ text: a, source: 'aria-label' });
+                    });
+                    document.querySelectorAll('h1, h2, h3').forEach(el => {
+                        const t = (el.textContent || '').trim();
+                        if (/review/i.test(t)) sources.push({ text: t, source: 'heading' });
+                    });
+                    // Anchor/button text like "Show all 24 reviews"
+                    document.querySelectorAll('a, button').forEach(el => {
+                        const t = (el.textContent || '').trim();
+                        if (/show all .*review/i.test(t)) sources.push({ text: t, source: 'show-all' });
+                    });
+
+                    // Extract the first "N review(s)" integer we find
+                    for (const s of sources) {
+                        const m = s.text.match(/(\d[\d,]*)\s*review/i);
+                        if (m) {
+                            const n = parseInt(m[1].replace(/,/g, ''), 10);
+                            if (!isNaN(n) && n > 0) {
+                                result.count = n;
+                                result.source = s.source;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Extract rating — look for "X.XX out of 5" first, then
+                    // "X.XX · N reviews" patterns.
+                    for (const s of sources) {
+                        let m = s.text.match(/(\d(?:\.\d{1,2})?)\s*out of\s*5/i);
+                        if (!m) m = s.text.match(/(\d\.\d{1,2})\s*[·•]\s*\d+\s*review/i);
+                        if (m) {
+                            const r = parseFloat(m[1]);
+                            if (!isNaN(r) && r > 0 && r <= 5) {
+                                result.rating = r;
+                                break;
+                            }
+                        }
+                    }
+                    return result;
+                }"""
+            ) or {}
+            if dom_rev.get("count") and not data["reviews"].get("count"):
+                data["reviews"]["count"] = dom_rev["count"]
+                print(
+                    f"INFO: DOM fallback set reviews.count = {dom_rev['count']} "
+                    f"(source: {dom_rev.get('source')})",
+                    file=sys.stderr,
+                )
+            if dom_rev.get("rating") and not data["reviews"].get("average_rating"):
+                data["reviews"]["average_rating"] = dom_rev["rating"]
+                print(
+                    f"INFO: DOM fallback set reviews.average_rating = {dom_rev['rating']}",
+                    file=sys.stderr,
+                )
+        except Exception as _e:
+            print(f"WARN: DOM review-count fallback failed: {_e}", file=sys.stderr)
+
     # Property type — extract from the breadcrumb or page title
     if not data["property"].get("property_type"):
         try:
@@ -1046,9 +1364,46 @@ def scrape(url: str, headless: bool = True, timeout_ms: int = 30000) -> dict:
                 except Exception:
                     continue
 
+        # Platform-reported total — drives reconciliation. If Niobe didn't
+        # surface a count, we fall back to whatever extraction returns.
+        platform_review_count = data["reviews"].get("count")
+
         if review_modal_opened:
-            scroll_reviews_modal(page)
+            scroll_reviews_modal(page, expected_count=platform_review_count)
             all_reviews = extract_reviews_from_modal(page)
+            print(
+                f"INFO: Modal extraction (Attempt 1) found {len(all_reviews)} reviews "
+                f"(platform reports {platform_review_count})",
+                file=sys.stderr,
+            )
+
+            # Reconciliation: if we got significantly fewer than the platform
+            # claims, re-scroll harder. This rescues the common case where the
+            # virtualised list briefly stalls between batches.
+            if (
+                platform_review_count
+                and len(all_reviews) < max(6, int(platform_review_count * 0.8))
+            ):
+                print(
+                    f"WARN: Modal extraction got {len(all_reviews)}/{platform_review_count} — "
+                    "running second scroll pass with extra patience",
+                    file=sys.stderr,
+                )
+                scroll_reviews_modal(
+                    page,
+                    max_rounds=300,
+                    stagnant_limit=12,
+                    settle_ms=1500,
+                    expected_count=platform_review_count,
+                )
+                retry_reviews = extract_reviews_from_modal(page)
+                if len(retry_reviews) > len(all_reviews):
+                    print(
+                        f"INFO: Reconciliation pass improved extraction "
+                        f"{len(all_reviews)} → {len(retry_reviews)}",
+                        file=sys.stderr,
+                    )
+                    all_reviews = retry_reviews
             _safe_click(page, "div[role='dialog'] button[aria-label='Close']")
 
         # Attempt 2: Extract reviews displayed inline on the page (no modal)
@@ -1248,19 +1603,48 @@ def scrape(url: str, headless: bool = True, timeout_ms: int = 30000) -> dict:
         data["reviews"]["all_reviews"] = all_reviews
         # Clean up the intermediate niobe_reviews key
         data["reviews"].pop("niobe_reviews", None)
+        # DO NOT silently set count = len(all_reviews) here. That was the
+        # 2026-04-19 regression: when Niobe missed (schema rename) and the
+        # inline DOM scrape grabbed only two review-ish fragments, the
+        # headline number reported to the host was "2" instead of the real
+        # 24. The DOM fallback above already populates count from the
+        # user-visible "Show all N reviews" label. If it's still missing
+        # here it means the page genuinely had no such label and we should
+        # leave count unset rather than manufacture a wrong one.
         if not data["reviews"].get("count") and all_reviews:
-            data["reviews"]["count"] = len(all_reviews)
+            print(
+                f"WARN: No platform count found but extracted {len(all_reviews)} "
+                "reviews — leaving reviews.count unset rather than inferring a "
+                "wrong total. If you see this, inspect the DOM fallback logs.",
+                file=sys.stderr,
+            )
 
         # Explicit flag and diagnostic logging for reviews
         review_count = data["reviews"].get("count") or 0
         extracted_count = len(all_reviews)
         data["reviews"]["has_reviews"] = review_count > 0 or extracted_count > 0
+        data["reviews"]["extracted_count"] = extracted_count
+        # Gap flag — true when the platform count disagrees meaningfully with
+        # what we actually extracted. Downstream (analysis + PDF) uses this
+        # to trust the platform headline number and note the shortfall instead
+        # of pretending we only had 6 reviews.
+        data["reviews"]["extraction_gap"] = bool(
+            review_count and extracted_count < max(6, int(review_count * 0.8))
+        )
         print(f"INFO: Reviews summary — platform count={review_count}, extracted={extracted_count}, "
+              f"gap={data['reviews']['extraction_gap']}, "
               f"average_rating={data['reviews'].get('average_rating')}, "
               f"breakdown keys={list((data['reviews'].get('breakdown') or {}).keys())}", file=sys.stderr)
         if extracted_count == 0 and review_count > 0:
             print(f"WARN: Platform reports {review_count} reviews but extraction got 0. "
                   f"Review data may be missing from the analysis.", file=sys.stderr)
+        elif data["reviews"]["extraction_gap"]:
+            print(
+                f"WARN: Platform reports {review_count} reviews but we extracted only "
+                f"{extracted_count}. Headline count will still show the platform value; "
+                f"sentiment analysis will caveat the gap.",
+                file=sys.stderr,
+            )
         elif extracted_count == 0:
             print(f"INFO: Listing has no reviews (new or unreviewed listing).", file=sys.stderr)
 

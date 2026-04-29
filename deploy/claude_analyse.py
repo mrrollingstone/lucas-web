@@ -155,28 +155,44 @@ ANALYSIS_SCHEMA_NOTE = """Analyse the listing and return this exact JSON shape:
     }
   ],
 
-  "review_sentiment_summary": "MANDATORY — never null or empty. If reviews exist: 2-3 paragraph analysis of review patterns — common themes, recurring praise, recurring complaints, specific guest quotes or paraphrases, and how sentiment has evolved if dates allow. If NO reviews exist: 1-2 paragraphs explaining the impact of having zero reviews on booking conversion and guest trust, plus actionable advice for earning first reviews."
+  "review_sentiment_summary": "MANDATORY — never null or empty. If reviews exist: 2-3 paragraph analysis of review patterns — common themes, recurring praise, recurring complaints, specific guest quotes or paraphrases, and how sentiment has evolved if dates allow. If NO reviews exist: 1-2 paragraphs explaining the impact of having zero reviews on booking conversion and guest trust, plus actionable advice for earning first reviews.",
+
+  "review_snapshot": {
+    "top_positive_theme": "ONE SHORT SENTENCE capturing the single most consistent positive theme across reviews — e.g. 'Hosts consistently praised for fast, friendly communication' or 'Guests repeatedly highlight the walk-everywhere location'. Must be grounded in actual review text. If NO reviews exist, set to null.",
+    "top_negative_theme": "ONE SHORT SENTENCE capturing the single most consistent friction theme across reviews — e.g. 'Several guests mention street noise at night' or 'A handful note the WiFi dropping on the top floor'. Must be grounded in actual review text. If NO negative theme is recurrent, or if NO reviews exist, set to null (do NOT invent a negative to balance the positive).",
+    "evidence_count": "number — approximately how many of the extracted reviews the top_positive_theme is drawn from. Null if no reviews."
+  }
 }
 
-Airbnb character limits (MUST be respected in all optimised copy):
+INTERNAL character limits (YOU must respect these silently — NEVER mention them to the host):
   - Title: 50 characters
   - About this place (description): 500 characters
   - The space: 500 characters
   - Guest access: 500 characters
   - Neighbourhood: 500 characters
   - Getting around: 500 characters
+  All optimised copy you generate MUST fit within these limits. But NEVER mention
+  character limits, character counts, or length constraints in any host-facing text
+  including quick_wins, priority_improvements, listing_quality assessments, or
+  descriptions. The host does not need to know about character limits — Airbnb
+  enforces them automatically. Your job is to produce copy that fits, not to tell
+  the host about the constraint.
 
 Rules:
 - BANNED TOPICS IN quick_wins AND priority_improvements — NEVER include any of these:
+  * Character limits, character counts, or title/description length (this is an
+    internal constraint for YOU — not advice for the host)
   * Host response rate (Airbnb-calculated, host cannot edit)
   * Host response time (Airbnb-calculated, host cannot edit)
   * Superhost status (Airbnb-calculated, host cannot edit)
   * Review scores (Airbnb-calculated, host cannot edit)
   * Any other platform-computed statistic
-  If you include "response rate", "response time", or "Superhost" in ANY quick_win
-  or priority_improvement title or description, the output is INVALID. These are
-  metrics hosts cannot control. Focus ONLY on listing content the host can edit:
-  title, description, photos, amenities list, pricing, house rules, etc.
+  If you include "character limit", "character count", "too long", "exceeds",
+  "response rate", "response time", or "Superhost" in ANY quick_win or
+  priority_improvement title or description, the output is INVALID. These are
+  either internal constraints or metrics hosts cannot control. Focus ONLY on
+  listing content the host can edit: title, description, photos, amenities list,
+  pricing, house rules, etc.
 - Never invent review quotes. Only use evidence that actually appears in the data.
 - Every recommendation must include the EXACT text to use or the EXACT action to take. Never give vague advice like "make the title more descriptive" — instead provide the actual new title.
 - Keep the host's voice when rewriting — optimise, don't replace. Reference their existing description when rewriting.
@@ -323,6 +339,60 @@ def dry_run_analysis(scraped: dict) -> dict:
     strengths_phrase = _pick_phrase(["love", "perfect", "amazing", "lovely"], None)
     friction_phrase = _pick_phrase(["but", "however", "wish", "issue", "problem"], None)
 
+    # Snapshot — derive a #1 positive and #1 negative theme from the actual
+    # extracted reviews. Keep it grounded; never invent a negative.
+    def _theme_from_keywords(keywords, polarity_label):
+        hits = 0
+        sample = None
+        for r in all_reviews:
+            txt = (r.get("text") or "").lower()
+            if any(k in txt for k in keywords):
+                hits += 1
+                if not sample:
+                    sample = (r.get("text") or "")[:140]
+        return hits, sample
+
+    positive_kw_groups = [
+        (["communicat", "respond", "responsive", "quick to reply", "easy to contact"],
+         "Guests repeatedly praise the host's communication and responsiveness."),
+        (["location", "walk", "central", "close to", "perfect spot"],
+         "Guests consistently call out the location as a key strength."),
+        (["clean", "spotless", "tidy"],
+         "Cleanliness is the most-mentioned positive across reviews."),
+        (["comfort", "comfy", "bed was", "cosy", "cozy"],
+         "Guests highlight comfort — beds, sofas and overall feel — as a recurring win."),
+    ]
+    negative_kw_groups = [
+        (["noise", "noisy", "loud", "street noise"],
+         "A small number of guests mention noise as the main downside."),
+        (["wifi", "internet", "connection drop"],
+         "A few reviews flag intermittent WiFi as the most consistent friction."),
+        (["hot water", "shower", "boiler"],
+         "Recurring mentions of hot-water/shower issues across a handful of stays."),
+        (["check-in", "checkin", "key", "instructions", "smart lock"],
+         "A handful of guests describe friction at check-in — keys, locks or instructions."),
+    ]
+    top_positive_theme = None
+    top_positive_hits = 0
+    for kws, theme in positive_kw_groups:
+        hits, _ = _theme_from_keywords(kws, "positive")
+        if hits > top_positive_hits:
+            top_positive_theme, top_positive_hits = theme, hits
+    top_negative_theme = None
+    top_negative_hits = 0
+    for kws, theme in negative_kw_groups:
+        hits, _ = _theme_from_keywords(kws, "negative")
+        if hits > top_negative_hits:
+            top_negative_theme, top_negative_hits = theme, hits
+    if all_reviews and not top_positive_theme:
+        # We have reviews but none matched a keyword group — still surface a
+        # generic, honest summary rather than null.
+        top_positive_theme = (
+            "Reviews skew positive overall, with a mix of praise across "
+            "stay quality, host attentiveness and value."
+        )
+        top_positive_hits = max(1, len(all_reviews) // 2)
+
     analysis = {
         "property_name": name,
         "platform": scraped.get("platform", "airbnb"),
@@ -463,6 +533,11 @@ def dry_run_analysis(scraped: dict) -> dict:
             "Once reviews start arriving, they become your most powerful marketing asset. Even a handful "
             "of detailed, positive reviews can dramatically improve your search ranking and conversion rate."
         ),
+        "review_snapshot": {
+            "top_positive_theme": top_positive_theme if all_reviews else None,
+            "top_negative_theme": top_negative_theme if all_reviews else None,
+            "evidence_count": (top_positive_hits or len(all_reviews)) if all_reviews else None,
+        },
     }
     return analysis
 
@@ -488,7 +563,9 @@ REQUIRED_LQ_KEYS = {"title", "photos", "description", "amenities", "host_profile
 
 # Patterns that flag a non-actionable, platform-computed metric recommendation.
 _BANNED_PATTERNS = re.compile(
-    r"response\s+rate|response\s+time|superhost\s+status|review\s+score",
+    r"response\s+rate|response\s+time|superhost\s+status|review\s+score"
+    r"|character\s+limit|character\s+count|char(?:acter)?\s+length"
+    r"|\bchars?\b.*\blimit\b|\btoo\s+long\b|\bexceeds?\b.*\blimit",
     re.IGNORECASE,
 )
 

@@ -100,12 +100,15 @@ def _styles():
                               spaceAfter=3),
         "eyebrow": ParagraphStyle("eyebrow", fontName="Helvetica-Bold", fontSize=9,
                                     leading=12, textColor=TEAL_DARK, spaceAfter=4),
+        # Body bumped 10.5 → 12 / leading 15 → 17 for mobile readability.
+        # Muted bumped 9.5 → 11 / leading 13 → 15. Headers (h1/h2/h3) left
+        # alone — bumping them too would push the report past A4 page targets.
         "body": ParagraphStyle("body", parent=s["BodyText"], fontName="Helvetica",
-                                fontSize=10.5, leading=15, textColor=INK, spaceAfter=6),
-        "muted": ParagraphStyle("muted", fontName="Helvetica", fontSize=9.5, leading=13,
+                                fontSize=12, leading=17, textColor=INK, spaceAfter=6),
+        "muted": ParagraphStyle("muted", fontName="Helvetica", fontSize=11, leading=15,
                                  textColor=MUTED),
-        "quote": ParagraphStyle("quote", fontName="Helvetica-Oblique", fontSize=10.5,
-                                 leading=15, textColor=INK, leftIndent=10,
+        "quote": ParagraphStyle("quote", fontName="Helvetica-Oblique", fontSize=12,
+                                 leading=17, textColor=INK, leftIndent=10,
                                  borderPadding=4),
         "cover_title": ParagraphStyle("cover_title", fontName="Helvetica-Bold",
                                         fontSize=32, leading=38, textColor=WHITE,
@@ -116,7 +119,7 @@ def _styles():
                                        leading=14, textColor=WHITE, alignment=TA_LEFT),
         "cta": ParagraphStyle("cta", fontName="Helvetica-Bold", fontSize=11,
                                leading=14, textColor=WHITE, alignment=TA_CENTER),
-        "code": ParagraphStyle("code", fontName="Helvetica", fontSize=10, leading=14,
+        "code": ParagraphStyle("code", fontName="Helvetica", fontSize=11.5, leading=16,
                                  textColor=INK, backColor=MIST, borderPadding=8,
                                  spaceBefore=4, spaceAfter=8),
     }
@@ -502,13 +505,23 @@ def build_dashboard(analysis: dict) -> list:
     overall = _normalise_category_score(scores.get("overall"))
 
     # Big overall ring + tagline
+    _hdr_reviews = analysis.get("total_reviews") or 0
+    if _hdr_reviews > 0:
+        _hdr_review_phrase = (
+            f"Based on {_hdr_reviews} guest review{'s' if _hdr_reviews != 1 else ''} "
+            "and a 360° audit of your content, photos, pricing, amenities, "
+            "SEO and host response."
+        )
+    else:
+        _hdr_review_phrase = (
+            "Based on a 360° audit of your content, photos, pricing, amenities, "
+            "SEO and host response. This listing has no guest reviews yet."
+        )
     header_tbl = Table(
         [[ScoreRing(overall, "Overall", size=52 * mm),
           Paragraph(
               f"<b>Overall listing score: {overall if overall is not None else '—'}/100</b><br/>"
-              f"Based on {_safe(analysis.get('total_reviews') or 0)} reviews "
-              f"and a 360° audit of your content, photos, pricing, amenities, "
-              f"SEO and host response. ",
+              + _safe(_hdr_review_phrase),
               STYLES["body"])]],
         colWidths=[60 * mm, None],
     )
@@ -545,41 +558,128 @@ def build_dashboard(analysis: dict) -> list:
         story.append(dash_grid)
     story.append(Spacer(1, 10))
 
-    # ── Guest reviews headline — overall score + count ──
+    # ── Guest reviews headline — Airbnb-apportioned score + count ──
+    # Always render this section. The banner mirrors the platform's score
+    # (e.g. 4.87 / 5) and review count, with an explicit empty state when
+    # the listing has no reviews. We deliberately use the platform headline
+    # count rather than the number we managed to extract — the platform
+    # number is what the host (and their guests) see.
     total_reviews = analysis.get("total_reviews") or 0
     overall_rating = analysis.get("overall_rating")
+    review_snapshot = analysis.get("review_snapshot") or {}
+
+    # Buffer the heading + banner so they reflow together — the bigger body
+    # font occasionally pushes the banner off-page from its heading.
+    review_header_block: list = [_p("Guest reviews", "h2")]
 
     if total_reviews > 0 and overall_rating is not None:
-        # Build a prominent guest-score banner
-        star_display = f"{float(overall_rating):.1f}"
+        star_display = f"{float(overall_rating):.2f}"
         filled_stars = int(round(float(overall_rating)))
         stars_str = "★" * filled_stars + "☆" * (5 - filled_stars)
         score_banner = Table([[
             Paragraph(
-                f"<font size='24' color='#2BB5B2'><b>{star_display}</b></font>"
-                f"<font size='12' color='#667085'> / 5</font>",
+                f"<font size='28' color='#2BB5B2'><b>{star_display}</b></font>"
+                f"<font size='14' color='#667085'> / 5</font>",
                 STYLES["body"]),
             Paragraph(
-                f"<font size='14' color='#F5A623'>{stars_str}</font><br/>"
-                f"<font size='10' color='#667085'>Based on <b>{total_reviews}</b> guest review{'s' if total_reviews != 1 else ''}</font>",
+                f"<font size='16' color='#F5A623'>{stars_str}</font><br/>"
+                f"<font size='11' color='#667085'>Based on <b>{total_reviews}</b> "
+                f"guest review{'s' if total_reviews != 1 else ''} on Airbnb</font>",
                 STYLES["body"]),
-        ]], colWidths=[50 * mm, None])
+        ]], colWidths=[55 * mm, None])
         score_banner.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("BACKGROUND", (0, 0), (-1, -1), TEAL_FAINT),
             ("BOX", (0, 0), (-1, -1), 1, TEAL),
-            ("LEFTPADDING", (0, 0), (-1, -1), 12),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+            ("LEFTPADDING", (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+            ("TOPPADDING", (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ]))
+        review_header_block.append(score_banner)
+    elif total_reviews > 0:
+        # We have a count but no average rating — still show the count.
+        partial_banner = Table([[
+            Paragraph(
+                f"<font size='16' color='#2BB5B2'><b>{total_reviews}</b></font>"
+                f"<font size='11' color='#667085'> guest review"
+                f"{'s' if total_reviews != 1 else ''} on Airbnb</font>",
+                STYLES["body"]),
+        ]], colWidths=[None])
+        partial_banner.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), TEAL_FAINT),
+            ("BOX", (0, 0), (-1, -1), 1, TEAL),
+            ("LEFTPADDING", (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 14),
             ("TOPPADDING", (0, 0), (-1, -1), 10),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
         ]))
-        story.append(_p("Guest reviews", "h2"))
-        story.append(score_banner)
-        story.append(Spacer(1, 8))
-    elif total_reviews > 0:
-        story.append(_p(f"Guest reviews ({total_reviews} reviews)", "h2"))
+        review_header_block.append(partial_banner)
     else:
-        story.append(_p("Guest reviews", "h2"))
+        # No-reviews state — match the visual weight of the score banner so
+        # the absence is read as a deliberate finding, not missing data.
+        no_reviews_banner = Table([[
+            Paragraph(
+                "<font size='14' color='#667085'><b>No reviews for this property yet</b></font><br/>"
+                "<font size='11' color='#667085'>Reviews are the single biggest trust signal "
+                "for guests — earning your first ones is the highest-impact lever you have right now.</font>",
+                STYLES["body"]),
+        ]], colWidths=[None])
+        no_reviews_banner.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), MIST),
+            ("BOX", (0, 0), (-1, -1), 0.6, MUTED),
+            ("LEFTPADDING", (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+            ("TOPPADDING", (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ]))
+        review_header_block.append(no_reviews_banner)
+
+    # Keep the heading and the banner on the same page.
+    story.append(KeepTogether(review_header_block))
+    story.append(Spacer(1, 8))
+
+    # ── Snapshot: #1 positive + #1 negative theme ──
+    # Render directly under the banner so the eye lands on it. Only show
+    # when the analysis surfaced at least one theme — otherwise it would
+    # repeat the empty-state banner above.
+    pos_theme = (review_snapshot.get("top_positive_theme") or "").strip()
+    neg_theme = (review_snapshot.get("top_negative_theme") or "").strip()
+    if pos_theme or neg_theme:
+        snap_rows = []
+        if pos_theme:
+            snap_rows.append([
+                Paragraph("<font color='#1FA85C'><b>+ What guests love</b></font>",
+                          STYLES["body"]),
+                Paragraph(_safe(pos_theme), STYLES["body"]),
+            ])
+        if neg_theme:
+            snap_rows.append([
+                Paragraph("<font color='#E64545'><b>− Most common friction</b></font>",
+                          STYLES["body"]),
+                Paragraph(_safe(neg_theme), STYLES["body"]),
+            ])
+        elif pos_theme:
+            # Honest empty-friction state: don't invent a negative.
+            snap_rows.append([
+                Paragraph("<font color='#667085'><b>− Most common friction</b></font>",
+                          STYLES["body"]),
+                Paragraph("<i>No recurring complaint stands out across these reviews.</i>",
+                          STYLES["muted"]),
+            ])
+        snap_tbl = Table(snap_rows, colWidths=[55 * mm, None])
+        snap_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("BACKGROUND", (0, 0), (-1, -1), MIST),
+            ("BOX", (0, 0), (-1, -1), 0.4, MIST),
+            ("INNERGRID", (0, 0), (-1, -1), 0.4, WHITE),
+        ]))
+        story.append(snap_tbl)
+        story.append(Spacer(1, 8))
 
     # Guest-rating breakdown — only show if at least one category has data.
     breakdown_fields = [("Cleanliness", "cleanliness"), ("Accuracy", "accuracy"),
@@ -699,15 +799,9 @@ def build_quick_wins(analysis: dict) -> list:
 
 
 def _char_count_label(text: str, limit: int) -> str:
-    """Return a coloured character count label only when approaching or exceeding the limit.
-    Returns empty string if well within the limit — no need to surface limits to the user."""
-    n = len(text)
-    if n > limit:
-        return f"<font color='#E64545'><b>{n}</b> / {limit} chars — over limit</font>"
-    elif n > limit * 0.9:
-        return f"<font color='#F5A623'><b>{n}</b> / {limit} chars</font>"
-    else:
-        return ""  # within limit — don't mention it
+    """Character limits are enforced silently by the Claude prompt — never surface
+    character counts or limit information to the host in the PDF report."""
+    return ""
 
 
 # Airbnb character limits (researched April 2026)
@@ -769,16 +863,14 @@ def build_content_review(scraped: dict, analysis: dict) -> list:
         alt_rows = [[
             Paragraph("<b>#</b>", STYLES["body"]),
             Paragraph("<b>Title</b>", STYLES["body"]),
-            Paragraph("<b>Chars</b>", STYLES["body"]),
         ]]
         for i, alt in enumerate(title_alts[:3], 1):
             alt_text = alt if isinstance(alt, str) else alt.get("text", str(alt))
             alt_rows.append([
                 Paragraph(str(i), STYLES["body"]),
                 Paragraph(_safe(alt_text), STYLES["body"]),
-                Paragraph(_char_count_label(alt_text, title_limit), STYLES["body"]),
             ])
-        alt_tbl = Table(alt_rows, colWidths=[12 * mm, None, 30 * mm])
+        alt_tbl = Table(alt_rows, colWidths=[12 * mm, None])
         alt_tbl.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), TEAL_FAINT),
             ("BOX", (0, 0), (-1, -1), 0.4, MIST),
