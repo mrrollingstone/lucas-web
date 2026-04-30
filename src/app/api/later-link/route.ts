@@ -1,23 +1,24 @@
 /**
  * POST /api/later-link
  *
- * "Email me a link to finish later" escape hatch on Step 1 of the Lucas
+ * "Email me a link to come back to" escape hatch on Step 1 of the Lucas
  * funnel. Captures an email from people who arrived on the landing page but
  * don't have their Airbnb listing URL to hand (most Meta-ad mobile traffic).
  *
  * What it does:
- *   1. Upserts the contact in Mailchimp and applies tag `listing-review-later`
- *      (this tag is what triggers the chase-up Customer Journey — see memory
- *      `reference_lucas_drip_mailchimp.md`).
+ *   1. Upserts the contact in Mailchimp and applies tag `lucas-paywall-later`
+ *      (paid-regime chase-up audience — replaces the legacy
+ *      `listing-review-later` tag, which still drives the legacy free-promise
+ *      Customer Journey for grandfathered leads).
  *   2. Also applies `listing-review-lead` so the contact shows up in the same
  *      lead pool as normal step-2 email captures (consistent reporting).
  *   3. Sends an immediate transactional email via Resend containing a magic
  *      link back to the landing page with `?email=<theirs>&utm_source=finish-later`
- *      — so when the user is ready, the URL step is all that's left.
+ *      — so when the user is ready, the URL step is all that's left. Email
+ *      copy reflects the paid £19 offer; no "free" promise.
  *
  * If the contact later completes a full review they pick up
- * `lucas-first-review` too. The chase-up journey in Mailchimp uses that tag as
- * its exit criteria (don't nag people who've already converted).
+ * `lucas-first-review` too.
  *
  * Env vars required:
  *   RESEND_API_KEY
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
   });
 }
 
-/* ── Mailchimp: upsert + tag `listing-review-later` + `listing-review-lead` ── */
+/* ── Mailchimp: upsert + tag `lucas-paywall-later` + `listing-review-lead` ── */
 async function tagInMailchimp(email: string): Promise<boolean> {
   if (!MC_API_KEY || !MC_LIST_ID) {
     console.warn("Mailchimp not configured — skipping later-link tag");
@@ -111,7 +112,11 @@ async function tagInMailchimp(email: string): Promise<boolean> {
 
     await mailchimp.lists.updateListMemberTags(MC_LIST_ID, subscriberHash, {
       tags: [
-        { name: "listing-review-later", status: "active" },
+        // `lucas-paywall-later` is the new (paid-regime) chase-up tag. The
+        // legacy free-regime tag `listing-review-later` is intentionally NOT
+        // applied here so we don't grandfather brand-new traffic into the
+        // free path via /api/submissions' isLegacyChaseUpLead lookup.
+        { name: "lucas-paywall-later", status: "active" },
         { name: "listing-review-lead", status: "active" },
       ],
     });
@@ -156,7 +161,7 @@ async function sendComeBackEmail(
         <title>Your Lucas link — paste your Airbnb URL when you're ready</title>
       </head>
       <body style="margin:0;padding:0;background:#F2F2F2;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:${BRAND_INK};">
-        <span style="display:none !important;opacity:0;color:transparent;height:0;width:0;">Your Lucas listing review is 60 seconds away — paste your Airbnb URL whenever you're ready.</span>
+        <span style="display:none !important;opacity:0;color:transparent;height:0;width:0;">Your Lucas listing review is ready whenever you are — paste your Airbnb URL when you've got a minute.</span>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2F2F2;padding:32px 0;">
           <tr><td align="center">
             <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:560px;">
@@ -165,8 +170,8 @@ async function sendComeBackEmail(
               </td></tr>
               <tr><td style="padding:28px;font-size:15px;line-height:1.6;">
                 <p style="margin:0 0 14px;color:${BRAND_TEAL};font-weight:600;">Hey there,</p>
-                <p style="margin:0 0 14px;">Thanks for asking us to save you a spot. Your free AI listing review is ready whenever you are &mdash; we just need your Airbnb listing URL.</p>
-                <p style="margin:0 0 22px;">When you've got a minute, grab your listing URL (from the Airbnb app or airbnb.com), tap the button below and paste it in. The report lands in this inbox roughly 60 seconds later.</p>
+                <p style="margin:0 0 14px;">Thanks for asking us to save you a spot. Your Lucas review is ready whenever you are &mdash; we just need your Airbnb listing URL.</p>
+                <p style="margin:0 0 22px;">When you've got a minute, grab your listing URL (from the Airbnb app or airbnb.com), tap the button below and paste it in. £19 one-off, secure Stripe checkout, then the report lands in this inbox a couple of minutes later.</p>
                 <p style="margin:0 0 22px;text-align:center;">
                   <a href="${link}" style="display:inline-block;background:${BRAND_RED};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 28px;border-radius:10px;">
                     Paste my Airbnb URL &rarr;
@@ -176,7 +181,7 @@ async function sendComeBackEmail(
                 <p style="margin:18px 0 0;">&mdash; The HelloHosty team</p>
               </td></tr>
               <tr><td style="background:#F8FAFA;padding:18px 28px;font-size:12px;color:#667085;text-align:center;">
-                You're receiving this because you asked us to email you a link to finish your free AI listing review at lucas.hellohosty.com.<br>
+                You're receiving this because you asked us to email you a link to come back to your Lucas review at lucas.hellohosty.com.<br>
                 HelloHosty &middot; <a href="mailto:lucas@hellohosty.com" style="color:#667085;">lucas@hellohosty.com</a> &middot; <a href="https://hellohosty.com" style="color:#667085;">hellohosty.com</a>
               </td></tr>
             </table>
@@ -188,8 +193,8 @@ async function sendComeBackEmail(
 
   const text =
     `Hey there,\n\n` +
-    `Thanks for asking us to save you a spot. Your free AI listing review is ready whenever you are — we just need your Airbnb listing URL.\n\n` +
-    `When you've got a minute, grab your listing URL (from the Airbnb app or airbnb.com), click the link below, and paste it in. The report lands in this inbox roughly 60 seconds later.\n\n` +
+    `Thanks for asking us to save you a spot. Your Lucas review is ready whenever you are — we just need your Airbnb listing URL.\n\n` +
+    `When you've got a minute, grab your listing URL (from the Airbnb app or airbnb.com), click the link below, and paste it in. £19 one-off, secure Stripe checkout, then the report lands in this inbox a couple of minutes later.\n\n` +
     `Paste my Airbnb URL: ${link}\n\n` +
     `— The HelloHosty team\n`;
 

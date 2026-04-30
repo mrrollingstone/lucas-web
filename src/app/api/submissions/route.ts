@@ -3,18 +3,28 @@
  *
  * Accepts the full session payload from the landing funnel after step 3.
  *
- * Step 0 (new): repeat-review gate.
- *    Before any compute, look the email up in `lucas_submissions`. If the
- *    caller has already had their free review we short-circuit with 402 and a
- *    Stripe Checkout URL instead of kicking off another scrape + analysis.
+ * Step 0 (paywall-from-start gate):
+ *    Before any compute, look the email up in `lucas_submissions`. If there
+ *    is no row at all, OR the caller has already received a review, we
+ *    short-circuit with 402 and a Stripe Checkout URL — every review is paid.
  *
- * Then, for first-time callers:
+ *    Grandfather exception: emails that were captured under the previous
+ *    free-first-review regime are honoured. There are two cohorts:
+ *      (a) anyone with an existing row in `lucas_submissions` and
+ *          reviews_delivered == 0  (they started the funnel, didn't finish);
+ *      (b) anyone tagged `listing-review-later` in Mailchimp (they left an
+ *          email via the "finish later" modal but never came back). For (b)
+ *          we do a one-shot Mailchimp tag lookup and, if matched, create the
+ *          DB row and let them through. After that single free run they're
+ *          counted as a normal paid customer.
+ *
+ * For first-time (paid) callers the 402 carries the Stripe Checkout URL.
+ * For grandfathered callers the rest of the pipeline runs as before:
  * 1. Scrapes the Airbnb listing title (so the welcome email reads naturally)
  * 2. Sends an immediate "Hey there, thanks for trying Lucas" email via Resend
- *    using the scraped property title — replaces the previous n8n lucas-drip
- *    webhook which sent the same email but with the raw URL embedded.
+ *    using the scraped property title.
  * 3. Forwards to n8n webhook (which kicks off the report-generation pipeline)
- * 4. Tags the email in Mailchimp with `lucas-first-review` (drives the 24h+ drip)
+ * 4. Tags the email in Mailchimp with `lucas-first-review` (drives the drip)
  * 5. Increments `reviews_delivered` on the submissions row. We count on n8n
  *    accept rather than a downstream delivery callback — pragmatic given we
  *    don't currently get a "PDF sent" signal back from n8n.
@@ -130,13 +140,28 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-real-ip") ||
     "unknown";
 
-  /* ── 0. Repeat-review gate — MUST run before any compute/cost ──
-   *    If this email has already been delivered a review, we refuse to
-   *    generate another free one. Instead we mint a Stripe Checkout URL and
-   *    hand it back with 402 Payment Required so the frontend can redirect.
-   */
+  /* ── 0. Paywall-from-start gate — MUST run before any compute/cost ──
+   *    Every review is paid. Two grandfather cohorts get a single free run:
+   *      (a) emails with an existing row + reviews_delivered == 0 (started
+   *          funnel under the old regime, haven't received yet)
+   *      (b) emails currently tagged `listing-review-later` in Mailchimp
+   *          (left email via "finish later" modal under the old regime).
+   *    Anyone else: 402 + Stripe Checkout URL. */
   const existing = await getSubmission(body.email);
-  if (existing && existing.reviews_delivered >= 1) {
+
+  let isGrandfathered = false;
+  if (!existing) {
+    // No DB row — check if they're in the legacy chase-up Mailchimp audience.
+    isGrandfathered = await isLegacyChaseUpLead(body.email);
+  } else if (existing.reviews_delivered === 0) {
+    // Started funnel under the old regime; let the old promise stand.
+    isGrandfathered = true;
+  }
+
+  const needsPayment = !isGrandfathered &&
+    (!existing || existing.reviews_delivered >= 1);
+
+  if (needsPayment) {
     // Member lookup (cached on the row for 7 days).
     const isHhMember = await lookupHhMember(body.email);
     const checkoutUrl = await createPaywallCheckout({
@@ -145,7 +170,7 @@ export async function POST(req: NextRequest) {
       isHhMember,
     });
     console.log(
-      `💳 Repeat review — paywall: email=${body.email} hh_member=${isHhMember} delivered=${existing.reviews_delivered}`,
+      `💳 Paywall: email=${body.email} hh_member=${isHhMember} delivered=${existing?.reviews_delivered ?? 0} new_email=${!existing}`,
     );
     return NextResponse.json(
       {
@@ -158,9 +183,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  /* ── 0b. First-time caller — record the row now so lookupHhMember can
+  /* ── 0b. Grandfathered caller — record the row now so lookupHhMember can
    *       cache against it. Idempotent; safe to call repeatedly. */
   await upsertFreeSubmission(body.email);
+  if (!existing) {
+    console.log(
+      `🎟  Grandfathered legacy chase-up lead: email=${body.email}`,
+    );
+  }
 
   /* ── 1. Scrape the listing title (best-effort, ~10s budget) ── */
   const propertyTitle =
@@ -264,7 +294,7 @@ async function sendWelcomeEmail(
                 <p style="margin:18px 0 0;">— The HelloHosty team</p>
               </td></tr>
               <tr><td style="background:#F8FAFA;padding:18px 28px;font-size:12px;color:#667085;text-align:center;">
-                You're receiving this because you requested a free AI listing review at lucas.hellohosty.com.<br>
+                You're receiving this because you requested a Lucas listing review at lucas.hellohosty.com.<br>
                 HelloHosty · <a href="mailto:lucas@hellohosty.com" style="color:#667085;">lucas@hellohosty.com</a> · <a href="https://hellohosty.com" style="color:#667085;">hellohosty.com</a>
               </td></tr>
             </table>
@@ -375,6 +405,40 @@ async function tagInMailchimp(
   } catch (err: any) {
     console.error(
       "Mailchimp tagging failed:",
+      err.response?.body?.detail || err.message,
+    );
+    return false;
+  }
+}
+
+/* ── Mailchimp grandfather check ──
+ * When a brand-new email hits the gate (no DB row yet), we still want to
+ * honour anyone in the legacy `listing-review-later` audience — those people
+ * left their email via the "finish later" modal under the old free-first
+ * regime and we promised them a free first review. One Mailchimp tag lookup;
+ * fail-closed (treat as not-grandfathered) so a Mailchimp outage doesn't open
+ * the paywall to everyone.
+ *
+ * NEW chase-up signups going forward use the `lucas-paywall-later` tag (see
+ * /api/later-link), so this check only matches the legacy cohort. */
+async function isLegacyChaseUpLead(email: string): Promise<boolean> {
+  if (!MC_API_KEY || !MC_LIST_ID) return false;
+  const subscriberHash = crypto
+    .createHash("md5")
+    .update(email.toLowerCase())
+    .digest("hex");
+  try {
+    const tagsRes = (await mailchimp.lists.getListMemberTags(
+      MC_LIST_ID,
+      subscriberHash,
+    )) as { tags?: Array<{ name: string }> };
+    const tags = tagsRes?.tags ?? [];
+    return tags.some((t) => t.name === "listing-review-later");
+  } catch (err: any) {
+    // 404 = contact doesn't exist in Mailchimp — definitely not legacy.
+    if (err?.status === 404 || err?.response?.status === 404) return false;
+    console.warn(
+      "Mailchimp grandfather lookup failed (treating as not legacy):",
       err.response?.body?.detail || err.message,
     );
     return false;

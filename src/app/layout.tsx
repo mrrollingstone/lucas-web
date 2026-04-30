@@ -27,9 +27,9 @@ const archivoBlack = Archivo_Black({
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 
 export const metadata: Metadata = {
-  title: "Free AI Listing Review | Hello Hosty",
+  title: "AI Listing Review by Lucas | Hello Hosty",
   description:
-    "Hello Hosty reviews your Airbnb listing and delivers a free professional report with scores, quick wins, and ready-to-paste optimised copy — in seconds.",
+    "Hello Hosty's AI reviews your Airbnb listing and delivers a professional PDF report with scores, quick wins, and ready-to-paste optimised copy — £19, in your inbox in minutes.",
   icons: {
     icon: "/icon.png",
     apple: "/apple-icon.png",

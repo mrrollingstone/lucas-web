@@ -116,7 +116,7 @@ function MockUrlInput() {
           </span>
         </div>
         <button className="mt-1.5 w-full rounded-[8px] bg-brand-red py-2 text-[12px] font-bold text-white">
-          Get free review
+          Get my Lucas review
         </button>
       </div>
       <div className="mt-3 text-center text-[11px] text-brand-grey400">
@@ -285,14 +285,14 @@ export default function HowItWorksPage() {
               href="/"
               className="rounded-input bg-brand-red px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-brand-redHover"
             >
-              Get your free review
+              Get my Lucas review
             </Link>
           </div>
           <Link
             href="/"
             className="rounded-input bg-brand-red px-3 py-1.5 text-[12px] font-semibold text-white sm:hidden"
           >
-            Get free review
+            Get my review
           </Link>
         </div>
       </div>
@@ -573,8 +573,8 @@ export default function HowItWorksPage() {
 
         <div className="mt-10 rounded-card bg-white p-4 shadow-card sm:p-8">
           <FaqItem
-            q="Is the first review actually free?"
-            a="Yes — your first listing review is completely free. No card required. We ask for your email so we can send the PDF — that's the only string attached."
+            q="How much does a review cost?"
+            a="£19 per review, paid through Stripe at checkout. Hello Hosty members pay £9 — same report, £10 off every time, applied automatically when you check out with your member email."
           />
           <FaqItem
             q="Do I need to connect my Airbnb account?"
@@ -605,8 +605,8 @@ export default function HowItWorksPage() {
             }
           />
           <FaqItem
-            q="Can I get more than one review?"
-            a="Yes. Your first review is free; additional listings and re-reviews are available on the Hello Hosty plans. Hello Hosty customers also get 30% off at checkout when they use their account email."
+            q="Can I review more than one listing?"
+            a="Yes — every listing is its own £19 run (or £9 for Hello Hosty members). Every review is written from scratch for that specific listing, so the report you get on listing two isn't a recycled version of listing one."
           />
         </div>
       </section>
@@ -621,14 +621,14 @@ export default function HowItWorksPage() {
             Paste your Airbnb URL. We&apos;ll do the rest.
           </h2>
           <p className="mx-auto mt-4 max-w-[460px] text-[15px] leading-relaxed text-white/80">
-            Your first listing review is free. No card, no account, no
-            commitment — just a proper read of your listing, in your inbox.
+            £19 a run, secure Stripe checkout, no account needed — just a
+            proper read of your listing, in your inbox in minutes.
           </p>
           <Link
             href="/"
             className="mt-8 inline-flex items-center gap-2 rounded-input bg-brand-red px-8 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-redHover"
           >
-            Get my free review
+            Get my Lucas review
             <svg
               width="18"
               height="18"
@@ -641,7 +641,7 @@ export default function HowItWorksPage() {
             </svg>
           </Link>
           <p className="mt-6 text-[12px] text-white/50">
-            100% free · no card required · report arrives in under 2 minutes
+            £19 per review · £9 for Hello Hosty members · report in minutes
           </p>
         </div>
       </section>

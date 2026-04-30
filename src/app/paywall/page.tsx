@@ -1,7 +1,8 @@
 /**
  * /paywall
  *
- * Shown when a user who's already had their free review tries again. Reached
+ * Shown to almost every user before their review runs (every review is paid;
+ * the only callers who skip this page are legacy grandfathered leads). Reached
  * two ways:
  *   1. Redirect from /api/submissions when it returns 402.
  *   2. Bounce-back from a cancelled Stripe Checkout (?cancelled=1).
@@ -10,8 +11,8 @@
  * string, then POSTs to /api/submissions again to get a fresh checkout URL.
  * We don't trust the `hh` query flag blindly; the API is the source of truth.
  *
- * Copy follows the honest-contract the rest of the site makes: first review
- * free, repeat reviews paid, members get 30% off. No urgency, no fake scarcity.
+ * Copy: £19 one-off for everyone, £9 for HelloHosty members. No urgency,
+ * no fake scarcity.
  */
 "use client";
 
@@ -118,12 +119,13 @@ function PaywallInner() {
           </div>
         )}
         <h1 className="font-display text-[clamp(34px,4.8vw,52px)] leading-[1.12] text-brand-dark">
-          You&apos;ve had your free one.
+          One step from your Lucas review.
         </h1>
         <p className="mx-auto mt-5 max-w-[560px] text-[16px] leading-relaxed text-brand-grey600">
-          Your first listing review is on us, always. Anything after that&apos;s
-          a small paid job — same brilliant report, same format, still written
-          from scratch for this listing.
+          Your AI listing review is a small paid job &mdash; £19 a run, or £9
+          if you&apos;re a Hello Hosty member. Same brilliant report either
+          way: scores, quick wins, and ready-to-paste copy, written from
+          scratch for this listing.
         </p>
         {email && (
           <p className="mx-auto mt-3 max-w-[560px] text-[13px] text-brand-grey400">
@@ -153,9 +155,10 @@ function PaywallInner() {
       {/* ── Footer strip ── */}
       <section className="mx-auto mt-16 max-w-3xl px-6 text-center">
         <p className="mx-auto max-w-[620px] text-[14px] leading-relaxed text-brand-grey600">
-          Why we charge for extras: each review costs us real compute — scraping,
-          analysis, PDF generation. The first is on us so you can judge the work.
-          After that it&apos;s a fair trade.
+          Why £19? Each review costs us real compute &mdash; scraping,
+          analysis, PDF generation, all written from scratch for your
+          listing. £19 keeps the lights on and the work honest. Want to see
+          what you&apos;re buying first? <a href="/sample" className="font-medium text-brand-teal hover:text-brand-tealDark">View a sample report &rarr;</a>
         </p>
         <p className="mt-4 text-[13px] text-brand-grey400">
           Need help or got a bulk request?{" "}
@@ -182,7 +185,7 @@ function OneOffCard({
   return (
     <div className="flex flex-col rounded-card bg-white p-8 shadow-card">
       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-teal">
-        Pay for this one
+        Single review
       </div>
       <div className="mt-3 flex items-baseline gap-2">
         <span className="font-display text-[56px] leading-none text-brand-dark">
@@ -191,8 +194,9 @@ function OneOffCard({
         <span className="text-[14px] text-brand-grey600">one-off</span>
       </div>
       <p className="mt-4 max-w-[320px] text-[15px] leading-relaxed text-brand-grey600">
-        One fresh listing review, delivered to your inbox. Same format, same
-        depth, still written from scratch for this listing.
+        One fresh listing review, delivered to your inbox in minutes.
+        Written from scratch for this listing &mdash; scores, quick wins,
+        and ready-to-paste copy.
       </p>
       <div className="mt-auto pt-6">
         {pending ? (

@@ -1,21 +1,27 @@
 "use client";
 
 /**
- * 3-step free-first-review funnel
+ * 3-step paid-review funnel
  *
- * Step 1: Hero — paste Airbnb URL → "Get free review"
- * Step 2: Email collect — frictionless email-only capture
- * Step 3: Animated AI generation → confirmation
+ * Step 1: Hero — paste Airbnb URL → "Get my Lucas review"
+ * Step 2: Email collect → frictionless email-only capture, then redirect to
+ *         /paywall via the 402 from /api/submissions.
+ * Step 3: Animated AI generation → confirmation. Only ever shown for
+ *         grandfathered legacy leads (anyone in flight under the old
+ *         free-first-review regime). New paid customers redirect at Step 2
+ *         and only see Step 3 after Stripe Checkout completes via
+ *         /api/stripe/webhook.
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 
 /* ─── Paywall redirect helper ─── *
- * If /api/submissions returns 402 (repeat review — email has already had its
- * free one), bounce to the paywall page with email+url+hh query params so it
- * can render the right pricing card without re-hitting the API immediately.
- * Returns true if we handled the response by redirecting. */
+ * /api/submissions returns 402 for almost everyone now — the only callers
+ * who skip the paywall are legacy grandfathered leads. Bounce to the
+ * paywall page with email+url+hh query params so it can render the right
+ * pricing card without re-hitting the API immediately. Returns true if we
+ * handled the response by redirecting. */
 async function maybeRedirectToPaywall(res: Response, email: string, url: string): Promise<boolean> {
   if (res.status !== 402) return false;
   let data: { needs_payment?: boolean; is_hh_member?: boolean; checkout_url?: string } = {};
@@ -129,8 +135,8 @@ export function LandingFunnel() {
   /* Step 1 */
   const [urlValue, setUrlValue] = useState("");
   const [urlError, setUrlError] = useState(false);
-  // Ref to the URL input so the "Get my free review" CTA below the fold can
-  // scroll + focus it cleanly.
+  // Ref to the URL input so the "Get my Lucas review" CTA below the fold
+  // can scroll + focus it cleanly.
   const heroInputRef = useRef<HTMLInputElement | null>(null);
 
   /* Step 2 */
@@ -493,8 +499,8 @@ export function LandingFunnel() {
               Paste your Airbnb URL here
             </h2>
             <p className="mb-6 text-center text-sm leading-relaxed text-brand-grey600">
-              We&apos;ll review your listing with AI and email you a free
-              professional report.
+              We&apos;ll review your listing with AI and email you a
+              professional PDF report. £19 one-off.
             </p>
 
             <input
@@ -522,11 +528,11 @@ export function LandingFunnel() {
               onClick={submitUrl}
               className="mt-5 w-full rounded-xl bg-brand-red px-6 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.98]"
             >
-              Try for free now
+              Continue to checkout
             </button>
 
             <p className="mt-4 text-center text-[13px] text-brand-grey400">
-              100% free&nbsp;&mdash; no card required
+              £19 per review&nbsp;&middot; secure Stripe checkout
             </p>
           </div>
         </div>
@@ -571,12 +577,12 @@ export function LandingFunnel() {
                   id="later-modal-title"
                   className="mb-2 text-center font-serif text-[26px] font-semibold text-brand-dark max-sm:text-[22px]"
                 >
-                  Email me a link to finish later
+                  Email me a link to come back to
                 </h2>
                 <p className="mb-6 text-center text-sm leading-relaxed text-brand-grey600">
                   Pop your email in and we&apos;ll send you a link. Grab your
-                  Airbnb URL when you&apos;ve got a minute, tap the link, and
-                  your free review is 60 seconds away.
+                  Airbnb URL when you&apos;ve got a minute, tap the link,
+                  and you&apos;re 60 seconds from your review.
                 </p>
 
                 <input
@@ -614,7 +620,7 @@ export function LandingFunnel() {
                 </button>
 
                 <p className="mt-4 text-center text-[13px] text-brand-grey400">
-                  We&apos;ll only email you about your free review.
+                  We&apos;ll only email you about your Lucas review.
                 </p>
               </>
             ) : (
@@ -788,7 +794,7 @@ export function LandingFunnel() {
                   onClick={submitUrl}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-input bg-brand-red px-6 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.97] max-sm:relative max-sm:right-auto max-sm:top-auto max-sm:mt-3 max-sm:w-full max-sm:translate-y-0 max-sm:justify-center max-sm:rounded-xl max-sm:py-4"
                 >
-                  Try for free now
+                  Get my Lucas review
                   <span aria-hidden>&rarr;</span>
                 </button>
               </div>
@@ -819,7 +825,7 @@ export function LandingFunnel() {
 
               {/* Helper */}
               <div className="flex items-center justify-center gap-4 text-[13px] text-brand-grey400">
-                <span>100% free&nbsp;&mdash; no card required</span>
+                <span>£19 per review&nbsp;&middot; secure Stripe checkout</span>
                 <span>&middot;</span>
                 <a
                   href="/sample"
@@ -919,8 +925,8 @@ export function LandingFunnel() {
                   What you get
                 </p>
                 <h2 className="mx-auto mt-3 max-w-[640px] font-display text-[clamp(26px,3.4vw,40px)] leading-tight text-brand-dark">
-                  A pro-grade review of your listing &mdash; free, in your
-                  inbox, in under&nbsp;2&nbsp;minutes.
+                  A pro-grade review of your listing &mdash; £19, in your
+                  inbox, in minutes.
                 </h2>
               </div>
 
@@ -992,8 +998,8 @@ export function LandingFunnel() {
               </div>
               <div className="mt-8 rounded-card bg-white p-6 shadow-card sm:p-8">
                 <FaqItem
-                  q="Is the first review actually free?"
-                  a="Yes — your first listing review is completely free. No card, no account. We ask for your email so we can send the PDF; that's the only string attached."
+                  q="How much does a review cost?"
+                  a="£19 per review, paid through Stripe. Hello Hosty members pay £9 — same report, £10 off every time, applied automatically when you check out with your member email."
                 />
                 <FaqItem
                   q="Do I need to connect my Airbnb account?"
@@ -1040,7 +1046,7 @@ export function LandingFunnel() {
                 onClick={focusHeroInput}
                 className="mt-8 inline-flex items-center gap-2 rounded-input bg-brand-red px-8 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-redHover active:scale-[.98]"
               >
-                Get my free review
+                Get my Lucas review
                 <svg
                   width="18"
                   height="18"
@@ -1053,8 +1059,8 @@ export function LandingFunnel() {
                 </svg>
               </button>
               <p className="mt-6 text-[12px] text-white/50">
-                100% free &middot; no card required &middot; report in under 2
-                minutes
+                £19 per review &middot; £9 for Hello Hosty members &middot;
+                report in minutes
               </p>
             </div>
           </section>
@@ -1067,21 +1073,6 @@ export function LandingFunnel() {
           <div className="mx-auto max-w-[480px] text-center">
             <StepsBar current={2} />
 
-            {/* Free badge */}
-            <div className="mb-5 inline-flex items-center gap-1.5 rounded-full bg-[#e8f9e8] px-3.5 py-1.5 text-xs font-semibold text-[#2a8a2a]">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Your first listing review is completely free
-            </div>
-
             {/* Email card */}
             <div className="rounded-card bg-white p-10 text-left shadow-cardLg max-sm:px-6 max-sm:py-7">
               <h2 className="mb-2 font-serif text-[26px] font-semibold">
@@ -1089,7 +1080,8 @@ export function LandingFunnel() {
               </h2>
               <p className="mb-7 text-sm leading-relaxed text-brand-grey600">
                 We&apos;ll review your listing with AI and email you a
-                professional PDF report&nbsp;&mdash; completely free.
+                professional PDF report. £19 one-off&nbsp;&mdash; secure
+                Stripe checkout on the next screen.
               </p>
 
               <label className="mb-1.5 block text-[13px] font-semibold text-brand-dark">
@@ -1145,7 +1137,7 @@ export function LandingFunnel() {
                   </>
                 ) : (
                   <>
-                    Get my free report
+                    Continue to checkout
                     <svg
                       width="18"
                       height="18"

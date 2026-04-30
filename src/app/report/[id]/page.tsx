@@ -118,7 +118,7 @@ export default async function ReportPage({ params }: Props) {
           href="https://lucas.hellohosty.com"
           className="inline-block text-brand-teal hover:text-brand-tealDark font-semibold text-sm transition-colors"
         >
-          Get another free review →
+          Review another listing →
         </a>
         <p className="text-brand-grey400 text-xs mt-4">
           © {new Date().getFullYear()} HelloHosty · lucas@hellohosty.com
