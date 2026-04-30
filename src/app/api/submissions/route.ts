@@ -80,6 +80,24 @@ interface SubmissionPayload {
   utm_source?: string;
 }
 
+/* ── Input validation ──
+ * Reject syntactically broken submissions before any compute (scrape +
+ * Claude analysis + PDF render + Cloudinary upload is ~2 minutes per run).
+ * Without this guard, junk values like "_removed_" pass the previous
+ * presence-only check, the pipeline runs, then SMTP rejects the recipient
+ * and we've burned compute on nothing.
+ *
+ * Email: standard "local@domain.tld" shape. Not full RFC 5322 (which is
+ * famously hard to express as a regex), but tight enough to reject any
+ * string without an @ and a dot in the domain part.
+ *
+ * Airbnb URL: matches the canonical /rooms/<digits> path that the scraper
+ * needs. Anything else (raw airbnb.com root, /experiences/, malformed)
+ * gets bounced with 400.
+ */
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+const AIRBNB_RE = /airbnb\.[a-z.]+\/(?:rooms|h)\/[A-Za-z0-9-]+/i;
+
 export async function POST(req: NextRequest) {
   let body: SubmissionPayload;
   try {
@@ -91,6 +109,18 @@ export async function POST(req: NextRequest) {
   if (!body.email || !body.listing_url) {
     return NextResponse.json(
       { error: "Missing required fields (email, listing_url)" },
+      { status: 400 },
+    );
+  }
+  if (!EMAIL_RE.test(body.email)) {
+    return NextResponse.json(
+      { error: "Invalid email address" },
+      { status: 400 },
+    );
+  }
+  if (!AIRBNB_RE.test(body.listing_url)) {
+    return NextResponse.json(
+      { error: "Invalid Airbnb listing URL. Expected airbnb.com/rooms/<id>." },
       { status: 400 },
     );
   }
