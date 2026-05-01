@@ -62,9 +62,19 @@ if (MC_API_KEY) {
 
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
-/* ── Brand colours (mirrors tailwind.config + email_templates.py) ── */
-const BRAND_TEAL = "#2BB5B2";
-const BRAND_INK = "#1F2933";
+/* ── Hello Hosty brand palette (locked).
+ *    Mirrors `delivery/email_templates.py` and the `hellohosty-design` skill.
+ *    The OLD `#2BB5B2` teal and `#1F2933` ink shipped here for several months;
+ *    they are retired and must not return. */
+const HH_CORAL = "#F44A5C";
+const HH_TEAL = "#28B59D";
+const HH_TEAL_SOFT = "#D8F0EB";
+const HH_CREAM = "#F5F1E8";
+const HH_INK = "#1A1A1A";
+const HH_INK_SOFT = "#4A4A4A";
+const HH_SURFACE = "#FFFFFF";
+const HH_FONT_STACK =
+  "'Mark Pro','Cabinet Grotesk','Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 /* ── Payload shape from the frontend ── */
 interface SubmissionPayload {
@@ -270,32 +280,47 @@ async function sendWelcomeEmail(
     return false;
   }
   const safeTitle = escapeHtml(propertyTitle);
+  // Hello Hosty brand shell. Cream bg, white card, Mark Pro stack, Hello Hosty
+  // wordmark + Lucas eyebrow tag, coral primary CTA, teal trust accents.
+  // Body td/p tags carry explicit font-weight:400 to defeat fallback fonts
+  // that render heavier than 400 in Outlook web / Gmail web.
   const html = `
     <!doctype html>
     <html lang="en-GB">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width">
-        <title>Thanks for trying Lucas</title>
+        <title>Your Lucas review is on its way</title>
       </head>
-      <body style="margin:0;padding:0;background:#F2F2F2;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:${BRAND_INK};">
-        <span style="display:none !important;opacity:0;color:transparent;height:0;width:0;">Your AI listing review is being generated now — usually 2-4 minutes.</span>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2F2F2;padding:32px 0;">
+      <body style="margin:0;padding:0;background:${HH_CREAM};font-family:${HH_FONT_STACK};color:${HH_INK};">
+        <span style="display:none !important;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">Your Lucas review of ${safeTitle} is being built now. Two to four minutes, then it lands here.</span>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${HH_CREAM};padding:32px 16px;">
           <tr><td align="center">
-            <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:560px;">
-              <tr><td style="background:${BRAND_TEAL};padding:18px 28px;color:#ffffff;font-weight:700;font-size:14px;letter-spacing:0.5px;">
-                HELLOHOSTY · AI LISTING REVIEW
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:${HH_SURFACE};border-radius:16px;overflow:hidden;max-width:600px;box-shadow:0 6px 24px -8px rgba(26,26,26,0.08);">
+              <tr><td style="padding:28px 32px 0 32px;font-weight:400;">
+                <span style="font-family:${HH_FONT_STACK};font-size:22px;font-weight:700;color:${HH_INK};letter-spacing:-0.01em;">Hello Hosty</span>
+                <span style="display:inline-block;margin-left:10px;padding:4px 10px;background:${HH_TEAL_SOFT};color:${HH_TEAL};border-radius:999px;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;vertical-align:2px;">Lucas</span>
               </td></tr>
-              <tr><td style="padding:28px;font-size:15px;line-height:1.55;">
-                <p style="margin:0 0 14px;color:${BRAND_TEAL};font-weight:600;">Hey there,</p>
-                <p style="margin:0 0 14px;">Thanks for trying Lucas, your AI listing review for <strong>${safeTitle}</strong>.</p>
-                <p style="margin:0 0 14px;">Our AI is analysing your listing right now — scoring it against best practice, finding the quick wins, and writing optimised copy you can paste straight back into Airbnb.</p>
-                <p style="margin:0 0 14px;">Your full PDF report will land in this inbox within the next few minutes. If it doesn't show up, check your spam folder and add <a href="mailto:lucas@hellohosty.com" style="color:${BRAND_TEAL};">lucas@hellohosty.com</a> to your contacts so the next ones come through cleanly.</p>
-                <p style="margin:18px 0 0;">— The HelloHosty team</p>
+              <tr><td style="padding:24px 32px 8px 32px;font-family:${HH_FONT_STACK};font-size:16px;line-height:1.6;color:${HH_INK};font-weight:400;">
+                <h1 style="margin:0 0 16px;font-family:${HH_FONT_STACK};font-size:28px;line-height:1.15;font-weight:700;color:${HH_INK};letter-spacing:-0.01em;">Your review is on its way.</h1>
+                <p style="margin:0 0 16px;font-weight:400;">Hi there,</p>
+                <p style="margin:0 0 16px;font-weight:400;">Thanks for trusting Lucas with your listing. We're reading ${safeTitle} now, scoring it against the patterns that move the needle on Airbnb, and writing optimised copy you can paste straight back in.</p>
+                <p style="margin:0 0 16px;font-weight:400;">The full PDF report will land in this inbox in the next two to four minutes.</p>
               </td></tr>
-              <tr><td style="background:#F8FAFA;padding:18px 28px;font-size:12px;color:#667085;text-align:center;">
-                You're receiving this because you requested a Lucas listing review at lucas.hellohosty.com.<br>
-                HelloHosty · <a href="mailto:lucas@hellohosty.com" style="color:#667085;">lucas@hellohosty.com</a> · <a href="https://hellohosty.com" style="color:#667085;">hellohosty.com</a>
+              <tr><td style="padding:8px 32px 8px 32px;font-family:${HH_FONT_STACK};font-size:14px;line-height:1.6;color:${HH_INK_SOFT};font-weight:400;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${HH_TEAL_SOFT};border-radius:12px;">
+                  <tr><td style="padding:14px 18px;font-family:${HH_FONT_STACK};font-size:14px;line-height:1.55;color:${HH_INK};font-weight:400;">
+                    <span style="color:${HH_TEAL};font-weight:600;">&check;</span> &nbsp;If it doesn't land, check your spam folder, then add <a href="mailto:lucas@hellohosty.com" style="color:${HH_TEAL};text-decoration:underline;font-weight:600;">lucas@hellohosty.com</a> to your contacts so the next ones come through cleanly.
+                  </td></tr>
+                </table>
+              </td></tr>
+              <tr><td style="padding:24px 32px 32px 32px;font-family:${HH_FONT_STACK};font-size:16px;line-height:1.6;color:${HH_INK};font-weight:400;">
+                <p style="margin:0 0 16px;font-weight:400;">Talk in a few minutes,</p>
+                <p style="margin:0;font-weight:400;">Lucas<br><span style="color:${HH_INK_SOFT};font-size:13px;">AI listing review at Hello Hosty</span></p>
+              </td></tr>
+              <tr><td style="background:${HH_CREAM};padding:20px 32px;font-family:${HH_FONT_STACK};font-size:12px;color:${HH_INK_SOFT};text-align:center;font-weight:400;">
+                You're receiving this because you ordered an AI listing review at lucas.hellohosty.com.<br>
+                Hello Hosty &middot; <a href="mailto:lucas@hellohosty.com" style="color:${HH_INK_SOFT};">lucas@hellohosty.com</a> &middot; <a href="https://hellohosty.com" style="color:${HH_INK_SOFT};">hellohosty.com</a>
               </td></tr>
             </table>
           </td></tr>
@@ -305,13 +330,13 @@ async function sendWelcomeEmail(
   `;
 
   const text =
-    `Hey there,\n\n` +
-    `Thanks for trying Lucas, your AI listing review for ${propertyTitle}.\n\n` +
-    `Our AI is analysing your listing right now — scoring it against best practice, ` +
-    `finding the quick wins, and writing optimised copy you can paste straight back into Airbnb.\n\n` +
-    `Your full PDF report will land in this inbox within the next few minutes. ` +
-    `If it doesn't show up, check your spam folder and add lucas@hellohosty.com to your contacts.\n\n` +
-    `— The HelloHosty team\n`;
+    `Hi there,\n\n` +
+    `Thanks for trusting Lucas with your listing. We're reading ${propertyTitle} now, scoring it against the patterns that move the needle on Airbnb, and writing optimised copy you can paste straight back in.\n\n` +
+    `The full PDF report will land in this inbox in the next two to four minutes.\n\n` +
+    `If it doesn't land, check your spam folder, then add lucas@hellohosty.com to your contacts so the next ones come through cleanly.\n\n` +
+    `Talk in a few minutes,\n\n` +
+    `Lucas\n` +
+    `AI listing review at Hello Hosty\n`;
 
   try {
     const { error } = await resend.emails.send({
