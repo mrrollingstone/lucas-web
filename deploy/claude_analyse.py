@@ -17,7 +17,7 @@ Usage
 Environment
 -----------
     ANTHROPIC_API_KEY          required for live calls
-    LUCAS_CLAUDE_MODEL         default: claude-sonnet-4-20250514
+    LUCAS_CLAUDE_MODEL         default: claude-sonnet-4-5
     LUCAS_CLAUDE_MAX_TOKENS    default: 8000
 
 The analysis JSON shape is fixed by the brief and also validated by
@@ -34,7 +34,7 @@ from datetime import date
 from typing import Any
 
 
-DEFAULT_MODEL = os.environ.get("LUCAS_CLAUDE_MODEL", "claude-sonnet-4-20250514")
+DEFAULT_MODEL = os.environ.get("LUCAS_CLAUDE_MODEL", "claude-sonnet-4-5")
 DEFAULT_MAX_TOKENS = int(os.environ.get("LUCAS_CLAUDE_MAX_TOKENS", "8000"))
 
 
