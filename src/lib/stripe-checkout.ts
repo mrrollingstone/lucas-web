@@ -66,7 +66,15 @@ export async function createPaywallCheckout(
     };
 
     if (input.isHhMember && memberCoupon) {
+      // Auto-apply the HH-member coupon. Stripe rejects discounts and
+      // allow_promotion_codes on the same session, so members get the £10
+      // off baked in (no code box) — and non-members see the code box.
       params.discounts = [{ coupon: memberCoupon }];
+    } else {
+      // Non-members see a "Add promotion code" box at checkout, so Clive
+      // (and customers he hands a code to — e.g. FREELUCAS for 100% off)
+      // can zero out the bill. Codes are managed in the Stripe Dashboard.
+      params.allow_promotion_codes = true;
     }
 
     const session = await stripe.checkout.sessions.create(params);
