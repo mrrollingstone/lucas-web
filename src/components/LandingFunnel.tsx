@@ -1023,6 +1023,13 @@ export function LandingFunnel() {
                 >
                   full walkthrough
                 </a>
+                {" "}or email{" "}
+                <a
+                  href="mailto:lucas@hellohosty.com"
+                  className="font-medium text-brand-teal hover:text-brand-tealDark"
+                >
+                  lucas@hellohosty.com
+                </a>
                 .
               </p>
             </div>
