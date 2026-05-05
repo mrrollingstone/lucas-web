@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import crypto from "crypto";
 import mailchimp from "@mailchimp/mailchimp_marketing";
+import { Resend } from "resend";
 import { incrementDelivered, recordStripeEvent, hasSeenStripeEvent } from "@/lib/db";
 
 export const runtime = "nodejs"; // raw body required
@@ -34,10 +35,26 @@ const N8N_TOKEN = process.env.N8N_WEBHOOK_TOKEN!;
 const MC_API_KEY = process.env.MAILCHIMP_API_KEY;
 const MC_LIST_ID = process.env.MAILCHIMP_LIST_ID;
 const MC_SERVER = MC_API_KEY?.split("-").pop() || "us1";
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 if (MC_API_KEY) {
   mailchimp.setConfig({ apiKey: MC_API_KEY, server: MC_SERVER });
 }
+
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+
+/* ── Hello Hosty brand palette (locked).
+ *    Mirrors `/api/submissions` sendWelcomeEmail and the `hellohosty-design`
+ *    skill. Keep these in sync whenever the welcome template is edited. */
+const HH_CORAL = "#F44A5C";
+const HH_TEAL = "#28B59D";
+const HH_TEAL_SOFT = "#D8F0EB";
+const HH_CREAM = "#F5F1E8";
+const HH_INK = "#1A1A1A";
+const HH_INK_SOFT = "#4A4A4A";
+const HH_SURFACE = "#FFFFFF";
+const HH_FONT_STACK =
+  "'Mark Pro','Cabinet Grotesk','Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 export async function POST(req: NextRequest) {
   const sig = req.headers.get("stripe-signature");
@@ -121,8 +138,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── Welcome / "on its way" email.
+    //    Under the paid-from-start regime (commit 1b9ad68, 2026-04-30),
+    //    /api/submissions short-circuits with 402 BEFORE its sendWelcomeEmail
+    //    runs, so the welcome email must fire from here for paying customers.
+    //    Best-effort, never blocks the Stripe ack. Listing title is best-guess
+    //    via cheap scrape — falls back to "your listing" if unavailable.
+    let welcomeOk = false;
+    if (email) {
+      try {
+        const propertyTitle =
+          (await fetchListingTitle(listingUrl)) || "your listing";
+        welcomeOk = await sendWelcomeEmail(email, propertyTitle);
+      } catch (e: any) {
+        console.error("Welcome email exception:", e?.message || e);
+      }
+    }
+
     console.log(
-      `💰 Stripe paid-review: email=${email} n8n=ok event=${event.id}`,
+      `💰 Stripe paid-review: email=${email} n8n=ok welcome=${welcomeOk ? "ok" : "fail"} event=${event.id}`,
     );
   }
 
@@ -153,4 +187,135 @@ async function tagPaidReview(email: string): Promise<void> {
   await mailchimp.lists.updateListMemberTags(MC_LIST_ID, subscriberHash, {
     tags: [{ name: "lucas-paid-review", status: "active" }],
   });
+}
+
+/* ── Listing-title scrape (best-effort, ~10s budget).
+ *    Mirrors fetchListingTitle in /api/submissions. We do NOT want to block
+ *    the Stripe ack on n8n latency, so the timeout is tight and we fall back
+ *    cleanly. If the title is missing, the welcome email reads "your listing"
+ *    rather than the property name. */
+async function fetchListingTitle(url: string): Promise<string | null> {
+  if (!N8N_URL || !N8N_TOKEN || !url) return null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10_000);
+    const res = await fetch(`${N8N_URL}/webhook/lucas/scrape`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-lucas-token": N8N_TOKEN,
+      },
+      body: JSON.stringify({ url, platform: "airbnb", title_only: true }),
+      signal: ctrl.signal,
+      cache: "no-store",
+    });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const data: any = await res.json().catch(() => ({}));
+    const title: string | undefined =
+      data?.content?.title || data?.property?.name || data?.title;
+    if (title && typeof title === "string" && title.trim().length > 0) {
+      return title.trim();
+    }
+    return null;
+  } catch (err: any) {
+    console.warn("Title scrape failed:", err?.message || err);
+    return null;
+  }
+}
+
+/* ── Welcome email via Resend.
+ *    Mirrors sendWelcomeEmail in /api/submissions/route.ts. If the template
+ *    there changes, change this one too. Subject pattern is the load-bearing
+ *    string the dashboard uses to classify the message as a confirmation. */
+async function sendWelcomeEmail(
+  toEmail: string,
+  propertyTitle: string,
+): Promise<boolean> {
+  if (!resend) {
+    console.warn("Resend not configured — skipping welcome email");
+    return false;
+  }
+  const safeTitle = escapeHtml(propertyTitle);
+  const html = `
+    <!doctype html>
+    <html lang="en-GB">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width">
+        <title>Your Lucas review is on its way</title>
+      </head>
+      <body style="margin:0;padding:0;background:${HH_CREAM};font-family:${HH_FONT_STACK};color:${HH_INK};">
+        <span style="display:none !important;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">Your Lucas review of ${safeTitle} is being built now. Two to four minutes, then it lands here.</span>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${HH_CREAM};padding:32px 16px;">
+          <tr><td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:${HH_SURFACE};border-radius:16px;overflow:hidden;max-width:600px;box-shadow:0 6px 24px -8px rgba(26,26,26,0.08);">
+              <tr><td style="padding:28px 32px 0 32px;font-weight:400;">
+                <span style="font-family:${HH_FONT_STACK};font-size:22px;font-weight:700;color:${HH_INK};letter-spacing:-0.01em;">Hello Hosty</span>
+                <span style="display:inline-block;margin-left:10px;padding:4px 10px;background:${HH_TEAL_SOFT};color:${HH_TEAL};border-radius:999px;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;vertical-align:2px;">Lucas</span>
+              </td></tr>
+              <tr><td style="padding:24px 32px 8px 32px;font-family:${HH_FONT_STACK};font-size:16px;line-height:1.6;color:${HH_INK};font-weight:400;">
+                <h1 style="margin:0 0 16px;font-family:${HH_FONT_STACK};font-size:28px;line-height:1.15;font-weight:700;color:${HH_INK};letter-spacing:-0.01em;">Your review is on its way.</h1>
+                <p style="margin:0 0 16px;font-weight:400;">Hi there,</p>
+                <p style="margin:0 0 16px;font-weight:400;">Thanks for trusting Lucas with your listing. We're reading ${safeTitle} now, scoring it against the patterns that move the needle on Airbnb, and writing optimised copy you can paste straight back in.</p>
+                <p style="margin:0 0 16px;font-weight:400;">The full PDF report will land in this inbox in the next two to four minutes.</p>
+              </td></tr>
+              <tr><td style="padding:8px 32px 8px 32px;font-family:${HH_FONT_STACK};font-size:14px;line-height:1.6;color:${HH_INK_SOFT};font-weight:400;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${HH_TEAL_SOFT};border-radius:12px;">
+                  <tr><td style="padding:14px 18px;font-family:${HH_FONT_STACK};font-size:14px;line-height:1.55;color:${HH_INK};font-weight:400;">
+                    <span style="color:${HH_TEAL};font-weight:600;">&check;</span> &nbsp;If it doesn't land, check your spam folder, then add <a href="mailto:lucas@hellohosty.com" style="color:${HH_TEAL};text-decoration:underline;font-weight:600;">lucas@hellohosty.com</a> to your contacts so the next ones come through cleanly.
+                  </td></tr>
+                </table>
+              </td></tr>
+              <tr><td style="padding:24px 32px 32px 32px;font-family:${HH_FONT_STACK};font-size:16px;line-height:1.6;color:${HH_INK};font-weight:400;">
+                <p style="margin:0 0 16px;font-weight:400;">Talk in a few minutes,</p>
+                <p style="margin:0;font-weight:400;">Lucas<br><span style="color:${HH_INK_SOFT};font-size:13px;">AI listing review at Hello Hosty</span></p>
+              </td></tr>
+              <tr><td style="background:${HH_CREAM};padding:20px 32px;font-family:${HH_FONT_STACK};font-size:12px;color:${HH_INK_SOFT};text-align:center;font-weight:400;">
+                You're receiving this because you ordered an AI listing review at lucas.hellohosty.com.<br>
+                Hello Hosty &middot; <a href="mailto:lucas@hellohosty.com" style="color:${HH_INK_SOFT};">lucas@hellohosty.com</a> &middot; <a href="https://hellohosty.com" style="color:${HH_INK_SOFT};">hellohosty.com</a>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+    </html>
+  `;
+  const text =
+    `Hi there,\n\n` +
+    `Thanks for trusting Lucas with your listing. We're reading ${propertyTitle} now, scoring it against the patterns that move the needle on Airbnb, and writing optimised copy you can paste straight back in.\n\n` +
+    `The full PDF report will land in this inbox in the next two to four minutes.\n\n` +
+    `If it doesn't land, check your spam folder, then add lucas@hellohosty.com to your contacts so the next ones come through cleanly.\n\n` +
+    `Talk in a few minutes,\n\n` +
+    `Lucas\n` +
+    `AI listing review at Hello Hosty\n`;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: "Lucas at HelloHosty <lucas@notify.hellohosty.com>",
+      to: [toEmail],
+      replyTo: "lucas@hellohosty.com",
+      subject: `Your Lucas review of ${propertyTitle} is on its way`,
+      html,
+      text,
+      headers: { "X-Entity-Ref-ID": `lucas-welcome-${Date.now()}` },
+    });
+    if (error) {
+      console.error("Resend welcome email failed:", error);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.error("Resend welcome email exception:", err?.message || err);
+    return false;
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
