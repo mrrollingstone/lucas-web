@@ -150,6 +150,12 @@ export function LandingFunnel() {
   /* Summit-campaign arrivals (?email=…&utm_source=summit) */
   const [isSummitLead, setIsSummitLead] = useState(false);
   const [emailPrefilled, setEmailPrefilled] = useState(false);
+  /* Raw utm_source — forwarded to /api/submissions so the server can branch.
+   * Currently used for two flows: summit-campaign leads (utm_source=summit)
+   * and HH-homepage handoff (utm_source=hellohosty_home, where the server
+   * grandfathers the first review per email to honour the home block's free
+   * promise). isSummitLead stays separate because it also drives Pixel events. */
+  const [utmSource, setUtmSource] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -163,6 +169,7 @@ export function LandingFunnel() {
       setEmailPrefilled(true);
     }
     if (qSource === "summit") setIsSummitLead(true);
+    if (qSource) setUtmSource(qSource);
     // Handoff from hellohosty.com homepage block — pre-fill step 1 with the
     // URL the visitor pasted there. Same airbnb/abnb validation as submitUrl.
     if (qUrl && (qUrl.includes("airbnb") || qUrl.includes("abnb"))) {
@@ -297,7 +304,7 @@ export function LandingFunnel() {
         platform: session.platform,
         is_first_time: true,
         submitted_at: now,
-        ...(isSummitLead ? { utm_source: "summit" } : {}),
+        ...(utmSource ? { utm_source: utmSource } : {}),
       };
       setSession((s) => ({ ...s, email: emailValue, submitted_at: now }));
       // Branch on 402 (repeat review → paywall). Await the response so the
@@ -326,7 +333,7 @@ export function LandingFunnel() {
     }
 
     goToStep(2);
-  }, [urlValue, goToStep, emailPrefilled, emailValue, isSummitLead, session.platform]);
+  }, [urlValue, goToStep, emailPrefilled, emailValue, isSummitLead, utmSource, session.platform]);
 
   /* ─── Step 2 → 3: Submit email & start pipeline ─── */
   const submitEmail = useCallback(async () => {
@@ -344,6 +351,7 @@ export function LandingFunnel() {
       platform: session.platform,
       is_first_time: true,
       submitted_at: now,
+      ...(utmSource ? { utm_source: utmSource } : {}),
     };
 
     setSession((s) => ({ ...s, email, submitted_at: now }));
@@ -372,7 +380,7 @@ export function LandingFunnel() {
     fbqTrack("Lead", { content_name: "lucas-free-review" });
 
     goToStep(3);
-  }, [emailValue, session, goToStep]);
+  }, [emailValue, session, goToStep, utmSource]);
 
   /* ─── Generation animation driver ─── */
   useEffect(() => {

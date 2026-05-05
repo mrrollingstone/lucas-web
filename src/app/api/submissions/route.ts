@@ -151,18 +151,25 @@ export async function POST(req: NextRequest) {
     "unknown";
 
   /* ── 0. Paywall-from-start gate — MUST run before any compute/cost ──
-   *    Every review is paid. Two grandfather cohorts get a single free run:
+   *    Every review is paid. Three grandfather cohorts get a single free run:
    *      (a) emails with an existing row + reviews_delivered == 0 (started
    *          funnel under the old regime, haven't received yet)
    *      (b) emails currently tagged `listing-review-later` in Mailchimp
    *          (left email via "finish later" modal under the old regime).
+   *      (c) brand-new emails arriving from the hellohosty.com home block
+   *          (utm_source=hellohosty_home). The home copy still promises a
+   *          free Lucas review; we honour that on the first review per email
+   *          and let the reviews_delivered counter paywall subsequent ones.
    *    Anyone else: 402 + Stripe Checkout URL. */
   const existing = await getSubmission(body.email);
+  const isHhHomeLead = body.utm_source === "hellohosty_home";
 
   let isGrandfathered = false;
   if (!existing) {
-    // No DB row — check if they're in the legacy chase-up Mailchimp audience.
-    isGrandfathered = await isLegacyChaseUpLead(body.email);
+    // No DB row — check if they're in the legacy chase-up Mailchimp audience,
+    // or arriving fresh from the hellohosty.com home block.
+    isGrandfathered =
+      isHhHomeLead || (await isLegacyChaseUpLead(body.email));
   } else if (existing.reviews_delivered === 0) {
     // Started funnel under the old regime; let the old promise stand.
     isGrandfathered = true;
@@ -197,8 +204,9 @@ export async function POST(req: NextRequest) {
    *       cache against it. Idempotent; safe to call repeatedly. */
   await upsertFreeSubmission(body.email);
   if (!existing) {
+    const cohort = isHhHomeLead ? "hh-home" : "legacy-chase-up";
     console.log(
-      `🎟  Grandfathered legacy chase-up lead: email=${body.email}`,
+      `🎟  Grandfathered ${cohort} lead: email=${body.email}`,
     );
   }
 
