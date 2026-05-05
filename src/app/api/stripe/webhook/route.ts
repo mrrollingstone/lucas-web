@@ -263,7 +263,7 @@ async function sendWelcomeEmail(
               <tr><td style="padding:8px 32px 8px 32px;font-family:${HH_FONT_STACK};font-size:14px;line-height:1.6;color:${HH_INK_SOFT};font-weight:400;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${HH_TEAL_SOFT};border-radius:12px;">
                   <tr><td style="padding:14px 18px;font-family:${HH_FONT_STACK};font-size:14px;line-height:1.55;color:${HH_INK};font-weight:400;">
-                    <span style="color:${HH_TEAL};font-weight:600;">&check;</span> &nbsp;If it doesn't land, check your spam folder, then add <a href="mailto:lucas@hellohosty.com" style="color:${HH_TEAL};text-decoration:underline;font-weight:600;">lucas@hellohosty.com</a> to your contacts so the next ones come through cleanly.
+                    <span style="color:${HH_TEAL};font-weight:600;">&check;</span> &nbsp;If it doesn't land, check your spam folder, then add <a href="mailto:lucas@hellohosty.com" style="color:${HH_TEAL};text-decoration:underline;font-weight:400;">lucas@hellohosty.com</a> to your contacts so the next ones come through cleanly.
                   </td></tr>
                 </table>
               </td></tr>
