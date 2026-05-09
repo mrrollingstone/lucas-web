@@ -2,11 +2,11 @@
  * POST /api/stripe/webhook
  *
  * Stripe sends checkout.session.completed events here. On success we forward
- * the listing job to n8n so the scrape → analysis → PDF → email pipeline runs.
+ * the listing job to n8n so the scrape â analysis â PDF â email pipeline runs.
  *
  * Three layers of safety on top of the original handler:
  *   - Signature verification (as before).
- *   - Idempotency via the stripe_event_log table — a Stripe replay never
+ *   - Idempotency via the stripe_event_log table â a Stripe replay never
  *     triggers a second PDF delivery.
  *   - After a successful n8n forward we bump `reviews_delivered` and tag the
  *     contact with `lucas-paid-review` in Mailchimp so the free-user drip
@@ -43,7 +43,7 @@ if (MC_API_KEY) {
 
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
-/* ── Hello Hosty brand palette (locked).
+/* ââ Hello Hosty brand palette (locked).
  *    Mirrors `/api/submissions` sendWelcomeEmail and the `hellohosty-design`
  *    skill. Keep these in sync whenever the welcome template is edited. */
 const HH_CORAL = "#F44A5C";
@@ -53,8 +53,15 @@ const HH_CREAM = "#F5F1E8";
 const HH_INK = "#1A1A1A";
 const HH_INK_SOFT = "#4A4A4A";
 const HH_SURFACE = "#FFFFFF";
+// 2026-05-09: Mark Pro and Cabinet Grotesk removed from the leading position.
+// Email clients ignore inline @font-face base64 and substitute Mark Pro with a
+// glyph wider than Bold, making body read heavy at font-weight:400. Match the
+// production Lucas pipeline stack (Lucas Live email_templates.py): Plus Jakarta
+// Sans first, then Helvetica Neue / Arial as system fallback. system-ui and
+// Segoe UI also render Regular heavier than expected on Gmail web / Outlook web,
+// so they are dropped too. Keep this in sync with /api/submissions/route.ts.
 const HH_FONT_STACK =
-  "'Mark Pro','Cabinet Grotesk','Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  "'Plus Jakarta Sans','Helvetica Neue',Helvetica,Arial,sans-serif";
 
 export async function POST(req: NextRequest) {
   const sig = req.headers.get("stripe-signature");
@@ -68,11 +75,11 @@ export async function POST(req: NextRequest) {
     return new NextResponse(`Webhook signature failure: ${e.message}`, { status: 400 });
   }
 
-  // Idempotency — peek first. If we've already fully processed this event,
+  // Idempotency â peek first. If we've already fully processed this event,
   // ack and do nothing. We only mark the event as processed AFTER the
   // downstream work succeeds, so a previous n8n failure can retry.
   if (await hasSeenStripeEvent(event.id)) {
-    console.log(`↩️  Stripe webhook replay ignored: ${event.id}`);
+    console.log(`â©ï¸  Stripe webhook replay ignored: ${event.id}`);
     return NextResponse.json({ received: true, replay: true });
   }
 
@@ -86,7 +93,7 @@ export async function POST(req: NextRequest) {
     const email = session.customer_email || md.email || "";
     const listingUrl = md.listing_url || md.airbnb_url || "";
 
-    // ── Safety guard — this Stripe account also handles HelloHosty
+    // ââ Safety guard â this Stripe account also handles HelloHosty
     //    (memberships, etc.). If the same webhook endpoint somehow receives a
     //    non-Lucas event, we do NOT want to forward it to n8n. A Lucas
     //    checkout always carries listing_url (set by createPaywallCheckout or
@@ -94,7 +101,7 @@ export async function POST(req: NextRequest) {
     //    that this event isn't ours. Ack and no-op.
     if (!listingUrl) {
       console.log(
-        `ℹ️  Ignoring non-Lucas checkout.session.completed (no listing_url): event=${event.id} session=${session.id}`,
+        `â¹ï¸  Ignoring non-Lucas checkout.session.completed (no listing_url): event=${event.id} session=${session.id}`,
       );
       await recordStripeEvent(event.id);
       return NextResponse.json({ received: true, ignored: true });
@@ -127,7 +134,7 @@ export async function POST(req: NextRequest) {
     if (!n8nOk) {
       // Return 5xx so Stripe automatically retries the webhook. We have NOT
       // recorded the event id yet, so the retry will be processed fresh.
-      console.error(`💥 n8n forward failed for ${event.id} — returning 5xx to force Stripe retry`);
+      console.error(`ð¥ n8n forward failed for ${event.id} â returning 5xx to force Stripe retry`);
       return new NextResponse("n8n forward failed", { status: 502 });
     }
 
@@ -138,12 +145,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Welcome / "on its way" email.
+    // ââ Welcome / "on its way" email.
     //    Under the paid-from-start regime (commit 1b9ad68, 2026-04-30),
     //    /api/submissions short-circuits with 402 BEFORE its sendWelcomeEmail
     //    runs, so the welcome email must fire from here for paying customers.
     //    Best-effort, never blocks the Stripe ack. Listing title is best-guess
-    //    via cheap scrape — falls back to "your listing" if unavailable.
+    //    via cheap scrape â falls back to "your listing" if unavailable.
     let welcomeOk = false;
     if (email) {
       try {
@@ -156,18 +163,18 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(
-      `💰 Stripe paid-review: email=${email} n8n=ok welcome=${welcomeOk ? "ok" : "fail"} event=${event.id}`,
+      `ð° Stripe paid-review: email=${email} n8n=ok welcome=${welcomeOk ? "ok" : "fail"} event=${event.id}`,
     );
   }
 
-  // All work done — mark the event processed so a replay is a no-op.
+  // All work done â mark the event processed so a replay is a no-op.
   await recordStripeEvent(event.id);
   return NextResponse.json({ received: true });
 }
 
 /**
  * Tag the contact with `lucas-paid-review`. We intentionally don't touch
- * `lucas-first-review` — the WS7 drip uses that tag to know "first free review
+ * `lucas-first-review` â the WS7 drip uses that tag to know "first free review
  * delivered", and for repeat paid customers both facts are true.
  */
 async function tagPaidReview(email: string): Promise<void> {
@@ -178,7 +185,7 @@ async function tagPaidReview(email: string): Promise<void> {
     .digest("hex");
 
   // Ensure the contact exists (they may be a brand-new paid customer who
-  // somehow skipped the free-review tagging — unlikely but cheap to cover).
+  // somehow skipped the free-review tagging â unlikely but cheap to cover).
   await mailchimp.lists.setListMember(MC_LIST_ID, subscriberHash, {
     email_address: email.toLowerCase(),
     status_if_new: "subscribed" as const,
@@ -189,7 +196,7 @@ async function tagPaidReview(email: string): Promise<void> {
   });
 }
 
-/* ── Listing-title scrape (best-effort, ~10s budget).
+/* ââ Listing-title scrape (best-effort, ~10s budget).
  *    Mirrors fetchListingTitle in /api/submissions. We do NOT want to block
  *    the Stripe ack on n8n latency, so the timeout is tight and we fall back
  *    cleanly. If the title is missing, the welcome email reads "your listing"
@@ -224,7 +231,7 @@ async function fetchListingTitle(url: string): Promise<string | null> {
   }
 }
 
-/* ── Welcome email via Resend.
+/* ââ Welcome email via Resend.
  *    Mirrors sendWelcomeEmail in /api/submissions/route.ts. If the template
  *    there changes, change this one too. Subject pattern is the load-bearing
  *    string the dashboard uses to classify the message as a confirmation. */
@@ -233,7 +240,7 @@ async function sendWelcomeEmail(
   propertyTitle: string,
 ): Promise<boolean> {
   if (!resend) {
-    console.warn("Resend not configured — skipping welcome email");
+    console.warn("Resend not configured â skipping welcome email");
     return false;
   }
   const safeTitle = escapeHtml(propertyTitle);
