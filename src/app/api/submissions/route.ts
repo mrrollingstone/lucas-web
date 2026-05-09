@@ -6,7 +6,7 @@
  * Step 0 (paywall-from-start gate):
  *    Before any compute, look the email up in `lucas_submissions`. If there
  *    is no row at all, OR the caller has already received a review, we
- *    short-circuit with 402 and a Stripe Checkout URL — every review is paid.
+ *    short-circuit with 402 and a Stripe Checkout URL â every review is paid.
  *
  *    Grandfather exception: emails that were captured under the previous
  *    free-first-review regime are honoured. There are two cohorts:
@@ -26,14 +26,14 @@
  * 3. Forwards to n8n webhook (which kicks off the report-generation pipeline)
  * 4. Tags the email in Mailchimp with `lucas-first-review` (drives the drip)
  * 5. Increments `reviews_delivered` on the submissions row. We count on n8n
- *    accept rather than a downstream delivery callback — pragmatic given we
+ *    accept rather than a downstream delivery callback â pragmatic given we
  *    don't currently get a "PDF sent" signal back from n8n.
  *
  * Env vars required:
- *   RESEND_API_KEY         — for the welcome email
+ *   RESEND_API_KEY         â for the welcome email
  *   N8N_BASE_URL, N8N_WEBHOOK_TOKEN
  *   MAILCHIMP_API_KEY, MAILCHIMP_LIST_ID
- *   DATABASE_URL           — Vercel Postgres (for the repeat-review gate)
+ *   DATABASE_URL           â Vercel Postgres (for the repeat-review gate)
  *   STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_MEMBER_COUPON (optional)
  */
 import { NextRequest, NextResponse } from "next/server";
@@ -48,7 +48,7 @@ import {
 import { lookupHhMember } from "@/lib/hh-member";
 import { createPaywallCheckout } from "@/lib/stripe-checkout";
 
-/* ── Env ── */
+/* ââ Env ââ */
 const N8N_URL = process.env.N8N_BASE_URL;
 const N8N_TOKEN = process.env.N8N_WEBHOOK_TOKEN;
 const MC_API_KEY = process.env.MAILCHIMP_API_KEY;
@@ -62,7 +62,7 @@ if (MC_API_KEY) {
 
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
-/* ── Hello Hosty brand palette (locked).
+/* ââ Hello Hosty brand palette (locked).
  *    Mirrors `delivery/email_templates.py` and the `hellohosty-design` skill.
  *    The OLD `#2BB5B2` teal and `#1F2933` ink shipped here for several months;
  *    they are retired and must not return. */
@@ -73,10 +73,17 @@ const HH_CREAM = "#F5F1E8";
 const HH_INK = "#1A1A1A";
 const HH_INK_SOFT = "#4A4A4A";
 const HH_SURFACE = "#FFFFFF";
+// 2026-05-09: Mark Pro and Cabinet Grotesk removed from the leading position.
+// Email clients ignore inline @font-face base64 and substitute Mark Pro with a
+// glyph wider than Bold, making body read heavy at font-weight:400. Match the
+// production Lucas pipeline stack (Lucas Live email_templates.py): Plus Jakarta
+// Sans first, then Helvetica Neue / Arial as system fallback. system-ui and
+// Segoe UI also render Regular heavier than expected on Gmail web / Outlook web,
+// so they are dropped too.
 const HH_FONT_STACK =
-  "'Mark Pro','Cabinet Grotesk','Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  "'Plus Jakarta Sans','Helvetica Neue',Helvetica,Arial,sans-serif";
 
-/* ── Payload shape from the frontend ── */
+/* ââ Payload shape from the frontend ââ */
 interface SubmissionPayload {
   email: string;
   // Most fields are optional so the summit-campaign path (which only carries
@@ -100,7 +107,7 @@ interface SubmissionPayload {
   utm_source?: string;
 }
 
-/* ── Input validation ──
+/* ââ Input validation ââ
  * Reject syntactically broken submissions before any compute (scrape +
  * Claude analysis + PDF render + Cloudinary upload is ~2 minutes per run).
  * Without this guard, junk values like "_removed_" pass the previous
@@ -150,7 +157,7 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-real-ip") ||
     "unknown";
 
-  /* ── 0. Paywall-from-start gate — MUST run before any compute/cost ──
+  /* ââ 0. Paywall-from-start gate â MUST run before any compute/cost ââ
    *    Every review is paid. Three grandfather cohorts get a single free run:
    *      (a) emails with an existing row + reviews_delivered == 0 (started
    *          funnel under the old regime, haven't received yet)
@@ -166,7 +173,7 @@ export async function POST(req: NextRequest) {
 
   let isGrandfathered = false;
   if (!existing) {
-    // No DB row — check if they're in the legacy chase-up Mailchimp audience,
+    // No DB row â check if they're in the legacy chase-up Mailchimp audience,
     // or arriving fresh from the hellohosty.com home block.
     isGrandfathered =
       isHhHomeLead || (await isLegacyChaseUpLead(body.email));
@@ -187,7 +194,7 @@ export async function POST(req: NextRequest) {
       isHhMember,
     });
     console.log(
-      `💳 Paywall: email=${body.email} hh_member=${isHhMember} delivered=${existing?.reviews_delivered ?? 0} new_email=${!existing}`,
+      `ð³ Paywall: email=${body.email} hh_member=${isHhMember} delivered=${existing?.reviews_delivered ?? 0} new_email=${!existing}`,
     );
     return NextResponse.json(
       {
@@ -200,41 +207,41 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  /* ── 0b. Grandfathered caller — record the row now so lookupHhMember can
+  /* ââ 0b. Grandfathered caller â record the row now so lookupHhMember can
    *       cache against it. Idempotent; safe to call repeatedly. */
   await upsertFreeSubmission(body.email);
   if (!existing) {
     const cohort = isHhHomeLead ? "hh-home" : "legacy-chase-up";
     console.log(
-      `🎟  Grandfathered ${cohort} lead: email=${body.email}`,
+      `ð  Grandfathered ${cohort} lead: email=${body.email}`,
     );
   }
 
-  /* ── 1. Scrape the listing title (best-effort, ~10s budget) ── */
+  /* ââ 1. Scrape the listing title (best-effort, ~10s budget) ââ */
   const propertyTitle =
     body.property_name?.trim() ||
     (await fetchListingTitle(body.listing_url)) ||
     "your listing";
 
-  /* ── 2. Send the immediate welcome email (uses the scraped title) ── */
+  /* ââ 2. Send the immediate welcome email (uses the scraped title) ââ */
   const welcomeOk = await sendWelcomeEmail(body.email, propertyTitle);
 
-  /* ── 3. Forward to n8n — kicks off the report-generation pipeline ── */
+  /* ââ 3. Forward to n8n â kicks off the report-generation pipeline ââ */
   const n8nOk = await forwardToN8n({ ...body, ip });
 
-  /* ── 4. Tag in Mailchimp — dual-tag summit-campaign leads ── */
+  /* ââ 4. Tag in Mailchimp â dual-tag summit-campaign leads ââ */
   const isSummit = body.utm_source === "summit";
   const mcOk = await tagInMailchimp(body.email, body.host_name || "", isSummit);
 
-  /* ── 5. Count the delivered review iff n8n accepted the job. We do NOT
-   *       bump the counter if n8n is unreachable — that's exactly the case
+  /* ââ 5. Count the delivered review iff n8n accepted the job. We do NOT
+   *       bump the counter if n8n is unreachable â that's exactly the case
    *       where the user hasn't actually had their free one. */
   if (n8nOk) {
     await incrementDelivered(body.email);
   }
 
   console.log(
-    `📋 Submission: email=${body.email} listing=${body.listing_url} title="${propertyTitle}" welcome=${welcomeOk ? "ok" : "fail"} n8n=${n8nOk ? "ok" : "fail"} mc=${mcOk ? "ok" : "fail"}${isSummit ? " [summit]" : ""}`,
+    `ð Submission: email=${body.email} listing=${body.listing_url} title="${propertyTitle}" welcome=${welcomeOk ? "ok" : "fail"} n8n=${n8nOk ? "ok" : "fail"} mc=${mcOk ? "ok" : "fail"}${isSummit ? " [summit]" : ""}`,
   );
 
   return NextResponse.json({
@@ -246,13 +253,13 @@ export async function POST(req: NextRequest) {
   });
 }
 
-/* ── Title scrape: ask the existing n8n scraper for the listing title.
- *    Falls back to the URL host if the scraper is slow or unreachable. ── */
+/* ââ Title scrape: ask the existing n8n scraper for the listing title.
+ *    Falls back to the URL host if the scraper is slow or unreachable. ââ */
 async function fetchListingTitle(url: string): Promise<string | null> {
   if (!N8N_URL || !N8N_TOKEN) return null;
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 10_000); // 10s budget — keep submission snappy
+    const t = setTimeout(() => ctrl.abort(), 10_000); // 10s budget â keep submission snappy
     const res = await fetch(`${N8N_URL}/webhook/lucas/scrape`, {
       method: "POST",
       headers: {
@@ -278,13 +285,13 @@ async function fetchListingTitle(url: string): Promise<string | null> {
   }
 }
 
-/* ── Welcome email via Resend ── */
+/* ââ Welcome email via Resend ââ */
 async function sendWelcomeEmail(
   toEmail: string,
   propertyTitle: string,
 ): Promise<boolean> {
   if (!resend) {
-    console.warn("Resend not configured — skipping welcome email");
+    console.warn("Resend not configured â skipping welcome email");
     return false;
   }
   const safeTitle = escapeHtml(propertyTitle);
@@ -367,12 +374,12 @@ async function sendWelcomeEmail(
   }
 }
 
-/* ── n8n forwarding (report pipeline) ── */
+/* ââ n8n forwarding (report pipeline) ââ */
 async function forwardToN8n(
   payload: SubmissionPayload & { ip: string },
 ): Promise<boolean> {
   if (!N8N_URL || !N8N_TOKEN) {
-    console.warn("n8n not configured — skipping submission forward");
+    console.warn("n8n not configured â skipping submission forward");
     return false;
   }
   try {
@@ -396,16 +403,16 @@ async function forwardToN8n(
   }
 }
 
-/* ── Mailchimp: upsert contact + apply tag(s).
+/* ââ Mailchimp: upsert contact + apply tag(s).
  *    Summit-campaign leads get both `lucas-first-review` and `summit-2026` so
- *    they land in the correct downstream drip path. ── */
+ *    they land in the correct downstream drip path. ââ */
 async function tagInMailchimp(
   email: string,
   firstName: string,
   isSummit: boolean = false,
 ): Promise<boolean> {
   if (!MC_API_KEY || !MC_LIST_ID) {
-    console.warn("Mailchimp not configured — skipping tag");
+    console.warn("Mailchimp not configured â skipping tag");
     return false;
   }
 
@@ -444,9 +451,9 @@ async function tagInMailchimp(
   }
 }
 
-/* ── Mailchimp grandfather check ──
+/* ââ Mailchimp grandfather check ââ
  * When a brand-new email hits the gate (no DB row yet), we still want to
- * honour anyone in the legacy `listing-review-later` audience — those people
+ * honour anyone in the legacy `listing-review-later` audience â those people
  * left their email via the "finish later" modal under the old free-first
  * regime and we promised them a free first review. One Mailchimp tag lookup;
  * fail-closed (treat as not-grandfathered) so a Mailchimp outage doesn't open
@@ -468,7 +475,7 @@ async function isLegacyChaseUpLead(email: string): Promise<boolean> {
     const tags = tagsRes?.tags ?? [];
     return tags.some((t) => t.name === "listing-review-later");
   } catch (err: any) {
-    // 404 = contact doesn't exist in Mailchimp — definitely not legacy.
+    // 404 = contact doesn't exist in Mailchimp â definitely not legacy.
     if (err?.status === 404 || err?.response?.status === 404) return false;
     console.warn(
       "Mailchimp grandfather lookup failed (treating as not legacy):",
@@ -478,7 +485,7 @@ async function isLegacyChaseUpLead(email: string): Promise<boolean> {
   }
 }
 
-/* ── Tiny HTML escape (avoid pulling a whole helper lib for one use) ── */
+/* ââ Tiny HTML escape (avoid pulling a whole helper lib for one use) ââ */
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
