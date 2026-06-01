@@ -185,14 +185,14 @@ async function sendComeBackEmail(
                 <p style="margin:0 0 16px;font-weight:400;">When you've got a minute, grab your listing URL from the Airbnb app or from airbnb.com, tap the button below and paste it in. £19 one off, secure Stripe checkout, then the full report lands in this inbox a couple of minutes later.</p>
                 <p style="margin:24px 0;font-weight:400;text-align:center;">
                   <a href="${link}" style="display:inline-block;background:${HH_CORAL};color:${HH_SURFACE};text-decoration:none;font-family:${HH_FONT_STACK};font-weight:600;font-size:16px;padding:14px 28px;border-radius:999px;box-shadow:0 8px 16px -4px rgba(244,74,92,0.35);">
-                    Paste my Airbnb URL &rarr;
+                    Paste my Airbnb URL →
                   </a>
                 </p>
               </td></tr>
               <tr><td style="padding:0 32px 8px 32px;font-family:${HH_FONT_STACK};font-size:14px;line-height:1.55;color:${HH_INK};font-weight:400;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${HH_TEAL_SOFT};border-radius:12px;">
                   <tr><td style="padding:14px 18px;font-family:${HH_FONT_STACK};font-size:13px;line-height:1.55;color:${HH_INK_SOFT};font-weight:400;">
-                    <span style="color:${HH_TEAL};font-weight:600;">&check;</span> &nbsp;Button not working? Copy this link instead: <a href="${link}" style="color:${HH_TEAL};word-break:break-all;text-decoration:underline;">${link}</a>
+                    <span style="color:${HH_TEAL};font-weight:600;">✓</span> &nbsp;Button not working? Copy this link instead: <a href="${link}" style="color:${HH_TEAL};word-break:break-all;text-decoration:underline;">${link}</a>
                   </td></tr>
                 </table>
               </td></tr>
@@ -201,7 +201,7 @@ async function sendComeBackEmail(
               </td></tr>
               <tr><td style="background:${HH_CREAM};padding:20px 32px;font-family:${HH_FONT_STACK};font-size:12px;color:${HH_INK_SOFT};text-align:center;font-weight:400;">
                 You're receiving this because you asked us to email you a link to come back to your Lucas review at lucas.hellohosty.com.<br>
-                Hello Hosty &middot; <a href="mailto:lucas@hellohosty.com" style="color:${HH_INK_SOFT};">lucas@hellohosty.com</a> &middot; <a href="https://hellohosty.com" style="color:${HH_INK_SOFT};">hellohosty.com</a>
+                Hello Hosty · <a href="mailto:lucas@hellohosty.com" style="color:${HH_INK_SOFT};">lucas@hellohosty.com</a> · <a href="https://hellohosty.com" style="color:${HH_INK_SOFT};">hellohosty.com</a>
               </td></tr>
             </table>
           </td></tr>
